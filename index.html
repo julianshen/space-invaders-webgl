@@ -629,7 +629,7 @@
     }
 
     function update() {
-      if (gameOver) return;
+      if (gameOver || !player) return;
 
       // 死亡時不能操控
       if (playerDead) {
