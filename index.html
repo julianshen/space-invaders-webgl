@@ -631,9 +631,10 @@
     function update() {
       if (gameOver) return;
 
-      // 死亡時不能操控，用 Date.now() 算重生時間
+      // 死亡時不能操控
       if (playerDead) {
         player.setVelocityX(0);
+        // 計時重生（不 return，讓 bounce/射擊邏輯繼續跑）
         if (Date.now() >= deadUntil) {
           player.setPosition(400, 550);
           player.setVisible(true);
@@ -642,25 +643,26 @@
           invulnerable = true;
           invulTimer = 0;
         }
-        return;
       }
 
-      // 無敵閃爍
-      if (invulnerable) {
-        invulTimer += this.game.loop.delta;
-        player.setAlpha(Math.sin(invulTimer * 0.015) > 0 ? 1 : 0.2);
-        if (invulTimer > 2500) {
-          invulnerable = false;
-          player.setAlpha(1);
+      if (!playerDead) {
+        // 無敵閃爍
+        if (invulnerable) {
+          invulTimer += this.game.loop.delta;
+          player.setAlpha(Math.sin(invulTimer * 0.015) > 0 ? 1 : 0.2);
+          if (invulTimer > 2500) {
+            invulnerable = false;
+            player.setAlpha(1);
+          }
         }
-      }
 
-      if (cursors.left.isDown) {
-        player.setVelocityX(-220);
-      } else if (cursors.right.isDown) {
-        player.setVelocityX(220);
-      } else {
-        player.setVelocityX(0);
+        if (cursors.left.isDown) {
+          player.setVelocityX(-220);
+        } else if (cursors.right.isDown) {
+          player.setVelocityX(220);
+        } else {
+          player.setVelocityX(0);
+        }
       }
 
       let bounce = false;
