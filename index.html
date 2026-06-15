@@ -41,6 +41,8 @@
     let gameOver = false;
     let lastShot = 0;
     let invaderSpeed = 80;
+    let enemyBullets;
+    let lastEnemyShot = 0;
 
     function preload() {
       const t = Date.now();
@@ -59,6 +61,13 @@
       ctx.fillRect(0, 0, 4, 10);
       bulletGfx.refresh();
 
+      // 用程式生成敵人子彈（紅色的長條）
+      const eBulletGfx = this.textures.createCanvas('ebullet', 4, 8);
+      const ectx = eBulletGfx.getContext();
+      ectx.fillStyle = '#ff4444';
+      ectx.fillRect(0, 0, 4, 8);
+      eBulletGfx.refresh();
+
       // Player - 強制設定合理尺寸
       player = this.physics.add.sprite(400, 550, 'spaceship');
       player.setDisplaySize(48, 24);
@@ -68,6 +77,7 @@
       this.input.keyboard.on('keydown-SPACE', shoot, this);
 
       bullets = this.physics.add.group();
+      enemyBullets = this.physics.add.group();
       invaders = this.physics.add.group();
       explosions = this.add.group();
 
@@ -90,10 +100,12 @@
 
       createWave.call(this, 1);
       this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
+      this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
     }
 
     function createWave(waveNum) {
       invaders.clear(true, true);
+      enemyBullets.clear(true, true);
 
       const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
       const cols = 8;
@@ -195,9 +207,47 @@
         });
       }
 
+      // Player子彈超出畫面清除
       bullets.getChildren().forEach(b => {
         if (b.y < 0) b.destroy();
       });
+
+      // 敵人射擊
+      const activeInvaders = invaders.getChildren().filter(inv => inv.active);
+      if (activeInvaders.length > 0) {
+        const now = this.time.now;
+        // 間隔隨波數遞減（越來越快）
+        const fireInterval = Math.max(600, 2000 - wave * 150);
+        if (now - lastEnemyShot > fireInterval) {
+          // 從最下排的敵人隨機挑一個射擊
+          // 找出 Y 值最大的幾隻（最接近玩家）
+          activeInvaders.sort((a, b) => b.y - a.y);
+          const shooters = activeInvaders.slice(0, Math.min(3, activeInvaders.length));
+          const shooter = Phaser.Math.RND.pick(shooters);
+
+          const eb = enemyBullets.create(shooter.x, shooter.y + 12, 'ebullet');
+          if (eb) {
+            eb.setVelocityY(180 + wave * 15);
+            eb.setSize(4, 8);
+            eb.setDisplaySize(4, 8);
+          }
+          lastEnemyShot = now;
+        }
+      }
+
+      // 敵人子彈超出畫面清除
+      enemyBullets.getChildren().forEach(b => {
+        if (b.y > 600) b.destroy();
+      });
+    }
+
+    function hitPlayer(enemyBullet, playerSprite) {
+      enemyBullet.destroy();
+      gameOver = true;
+      const exp = explosions.create(playerSprite.x, playerSprite.y);
+      exp.setDisplaySize(48, 24);
+      exp.play('explode');
+      scoreText.setText(`WAVE ${wave} - GAME OVER - PRESS SPACE`);
     }
 
     window.addEventListener('keydown', e => {
