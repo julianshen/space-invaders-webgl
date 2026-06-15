@@ -51,6 +51,13 @@
     }
 
     function create() {
+      // 用程式生成子彈貼圖（綠色的長條）
+      const bulletGfx = this.textures.createCanvas('bullet', 4, 10);
+      const ctx = bulletGfx.getContext();
+      ctx.fillStyle = '#00ff00';
+      ctx.fillRect(0, 0, 4, 10);
+      bulletGfx.refresh();
+
       // Player - 強制設定合理尺寸
       player = this.physics.add.sprite(400, 550, 'spaceship');
       player.setDisplaySize(48, 24);
@@ -173,14 +180,14 @@
       if (bounce) {
         invaders.getChildren().forEach(inv => {
           if (inv.active) {
-            // 反彈後速度稍微加快（越打越快）
+            // 反彈後速度稍微加快（越打越快，但幅度小一點）
             const currentSpeed = Math.abs(inv.body.velocity.x);
-            const newSpeed = Math.min(currentSpeed + 6, 280);
+            const newSpeed = Math.min(currentSpeed + 2, 220);
             const dir = side === 'left' ? 1 : -1;
             inv.setVelocityX(newSpeed * dir);
             // 階梯式掉落：後排掉得少，前排掉得多
             const row = inv.getData('row') || 0;
-            const dropAmount = 8 + row * 2 + Math.floor(Math.random() * 4);
+            const dropAmount = 6 + row * 1.5;
             inv.y += dropAmount;
           }
         });
