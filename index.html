@@ -569,6 +569,7 @@
     }
 
     function createWave(waveNum) {
+      try {
       invaders.clear(true, true);
       enemyBullets.clear(true, true);
 
@@ -588,9 +589,11 @@
           inv.setData('row', row);
         }
       }
+    } catch(e) { console.warn('createWave err:',e); }
     }
 
     function shoot() {
+      try {
       if (gameOver || playerDead) return;
       const now = this.time.now;
       if (now - lastShot < 180) return;
@@ -602,6 +605,7 @@
         bullet.setDisplaySize(4, 10);
       }
       lastShot = now;
+    } catch(e) { console.warn('shoot err:',e); }
     }
 
     function hitInvader(bullet, invader) {
@@ -754,6 +758,7 @@
     }
 
     function hitPlayer(enemyBullet, playerSprite) {
+      try {
       if (invulnerable || gameOver || playerDead) return;
       enemyBullet.destroy();
       lives--;
@@ -782,6 +787,7 @@
         playerSprite.body.enable = false;
         // 剩下的敵人子彈自然飛出畫面 cleanup，不在物理回呼內 destroy
       }
+    } catch(e) { console.warn('hitPlayer err:',e); }
     }
 
     // 繪製生命圖示（右上角小戰機）
