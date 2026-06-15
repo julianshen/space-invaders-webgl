@@ -94,13 +94,6 @@
       });
 
       // Game Over 畫面 (戲劇版)
-      // 暗色 overlay
-      const goOverlay = this.add.graphics();
-      goOverlay.fillStyle(0x000000, 0.7);
-      goOverlay.fillRect(0, 0, 800, 600);
-      goOverlay.setVisible(false);
-      window.goOverlayRef = goOverlay;
-
       gameOverText = this.add.text(400, 250, 'GAME OVER', {
         fontFamily: 'monospace',
         fontSize: '72px',
@@ -217,7 +210,7 @@
         if (inv.active && inv.y > 530) {
           gameOver = true;
           scoreText.setVisible(false);
-          if (window.goOverlayRef) window.goOverlayRef.setVisible(true);
+          
           gameOverText.setVisible(true);
           restartText.setVisible(true);
         }
@@ -280,7 +273,7 @@
       exp.setDisplaySize(48, 24);
       exp.play('explode');
       scoreText.setVisible(false);
-      if (window.goOverlayRef) window.goOverlayRef.setVisible(true);
+      
       gameOverText.setVisible(true);
       restartText.setVisible(true);
     }
