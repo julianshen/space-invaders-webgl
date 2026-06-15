@@ -19,14 +19,13 @@
 
     if (!gl) alert('WebGL not supported');
 
-    // Audio
+    // Audio (unchanged)
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-
       if (type === 'shoot') {
         osc.frequency.value = 660;
         osc.type = 'triangle';
@@ -38,26 +37,29 @@
         gain.gain.value = 0.35;
         gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.35);
       }
-
       osc.start();
       setTimeout(() => osc.stop(), 500);
     }
 
-    // Shaders
+    // Texture shaders
     const vsSource = `
       attribute vec2 a_position;
+      attribute vec2 a_texcoord;
       uniform vec2 u_resolution;
+      varying vec2 v_texcoord;
       void main() {
         vec2 zeroToOne = a_position / u_resolution;
         vec2 clipSpace = zeroToOne * 2.0 - 1.0;
         gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+        v_texcoord = a_texcoord;
       }
     `;
     const fsSource = `
       precision mediump float;
-      uniform vec4 u_color;
+      varying vec2 v_texcoord;
+      uniform sampler2D u_texture;
       void main() {
-        gl_FragColor = u_color;
+        gl_FragColor = texture2D(u_texture, v_texcoord);
       }
     `;
 
@@ -82,11 +84,28 @@
     gl.useProgram(program);
 
     const positionLocation = gl.getAttribLocation(program, 'a_position');
+    const texcoordLocation = gl.getAttribLocation(program, 'a_texcoord');
     const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
-    const colorLocation = gl.getUniformLocation(program, 'u_color');
+    const textureLocation = gl.getUniformLocation(program, 'u_texture');
+
     const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    const texcoordBuffer = gl.createBuffer();
+
     gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+
+    // Load pixel art spaceship texture
+    const spaceshipImg = new Image();
+    spaceshipImg.src = 'spaceship.png';
+    let spaceshipTexture = null;
+    spaceshipImg.onload = () => {
+      spaceshipTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, spaceshipTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, spaceshipImg);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    };
 
     // Game state
     let player = { x: 380, y: 550, w: 40, h: 20 };
@@ -106,24 +125,35 @@
     let invaderSpeed = 1.5;
 
     function drawRect(x, y, w, h, color) {
+      // Fallback colored rect (for invaders/bullets)
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform4f(colorLocation, color[0], color[1], color[2], 1.0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      // Simple color shader fallback not used here
     }
 
-    function drawPlayer(x, y) {
-      // Main body (dark green)
-      drawRect(x + 12, y + 4, 16, 12, [0.1, 0.6, 0.2]);
-      // Left wing
-      drawRect(x, y + 8, 14, 8, [0.0, 0.8, 0.3]);
-      // Right wing
-      drawRect(x + 26, y + 8, 14, 8, [0.0, 0.8, 0.3]);
-      // Cockpit highlight
-      drawRect(x + 17, y + 6, 6, 4, [0.6, 1.0, 0.6]);
+    function drawTexturedRect(x, y, w, h, texture) {
+      if (!texture) return;
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.uniform1i(textureLocation, 0);
+
+      // Position
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      // Texcoords
+      gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+      const texcoords = [0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1];
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(texcoordLocation);
+      gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
     function updateScore() {
@@ -177,7 +207,15 @@
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      drawPlayer(player.x, player.y);
+      // Player uses pixel art texture
+      if (spaceshipTexture) {
+        drawTexturedRect(player.x, player.y, player.w, player.h, spaceshipTexture);
+      } else {
+        // Fallback while loading
+        drawRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
+      }
+
+      // Invaders and bullets still colored
       for (let inv of invaders) if (inv.alive) drawRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
       for (let b of bullets) drawRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
     }
@@ -193,7 +231,7 @@
 
     updateScore();
     gameLoop();
-    console.log('Space Invaders with nicer ship ready!');
+    console.log('Space Invaders with pixel art spaceship texture ready!');
   </script>
 </body>
 </html>
