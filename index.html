@@ -51,26 +51,22 @@
     }
 
     function create() {
-      // Player
       player = this.physics.add.sprite(400, 550, 'spaceship');
       player.setCollideWorldBounds(true);
 
       cursors = this.input.keyboard.createCursorKeys();
       this.input.keyboard.on('keydown-SPACE', shoot, this);
 
-      // Groups
       bullets = this.physics.add.group();
       invaders = this.physics.add.group();
       explosions = this.add.group();
 
-      // Score
       scoreText = this.add.text(16, 16, 'WAVE 1   SCORE: 00000', {
         fontFamily: 'monospace',
         fontSize: '22px',
         color: '#00ff00'
       });
 
-      // Explosion animation
       this.anims.create({
         key: 'explode',
         frames: [
@@ -83,8 +79,6 @@
       });
 
       createWave.call(this, 1);
-
-      // Collision
       this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
     }
 
@@ -94,10 +88,14 @@
       const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
       const cols = 8;
 
+      // Better centered placement with tighter spacing
+      const spacingX = 68;
+      const startX = 110;
+
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          const inv = invaders.create(100 + col * 80, 90 + row * 55, 'invader');
-          inv.setVelocityX(invaderSpeed + (waveNum - 1) * 20);
+          const inv = invaders.create(startX + col * spacingX, 90 + row * 55, 'invader');
+          inv.setVelocityX(invaderSpeed + (waveNum - 1) * 18);
         }
       }
     }
@@ -126,7 +124,6 @@
       const exp = explosions.create(invader.x, invader.y);
       exp.play('explode');
 
-      // Check wave clear
       if (invaders.countActive(true) === 0) {
         wave++;
         updateScoreText();
@@ -143,7 +140,6 @@
     function update() {
       if (gameOver) return;
 
-      // Player movement
       if (cursors.left.isDown) {
         player.setVelocityX(-220);
       } else if (cursors.right.isDown) {
@@ -152,7 +148,6 @@
         player.setVelocityX(0);
       }
 
-      // Invader edge bounce + drop
       let bounce = false;
       invaders.getChildren().forEach(inv => {
         if (inv.active && (inv.x < 40 || inv.x > 760)) {
@@ -173,13 +168,11 @@
         });
       }
 
-      // Clean off-screen bullets
       bullets.getChildren().forEach(b => {
         if (b.y < 0) b.destroy();
       });
     }
 
-    // Restart
     window.addEventListener('keydown', e => {
       if (gameOver && e.key === ' ') {
         location.reload();
