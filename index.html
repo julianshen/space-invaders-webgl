@@ -777,9 +777,7 @@
         deadUntil = Date.now() + 1200;
         playerSprite.setVisible(false);
         playerSprite.body.enable = false;
-
-        // 清除畫面中的敵人子彈
-        enemyBullets.getChildren().forEach(b => b.destroy());
+        // 剩下的敵人子彈自然飛出畫面 cleanup，不在物理回呼內 destroy
       }
     }
 
