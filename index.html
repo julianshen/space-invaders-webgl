@@ -51,7 +51,9 @@
     }
 
     function create() {
+      // Player - 強制設定合理尺寸
       player = this.physics.add.sprite(400, 550, 'spaceship');
+      player.setDisplaySize(48, 24);
       player.setCollideWorldBounds(true);
 
       cursors = this.input.keyboard.createCursorKeys();
@@ -87,14 +89,13 @@
 
       const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
       const cols = 8;
-
-      // Better centered placement with tighter spacing
       const spacingX = 68;
       const startX = 110;
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const inv = invaders.create(startX + col * spacingX, 90 + row * 55, 'invader');
+          inv.setDisplaySize(42, 24);           // 強制設定尺寸
           inv.setVelocityX(invaderSpeed + (waveNum - 1) * 18);
         }
       }
