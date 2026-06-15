@@ -482,6 +482,14 @@
     let restartText;
     let goOverlayRef;
 
+    // === 生命系統 ===
+    let lives = 3;
+    let livesIcons = [];
+    let playerDead = false;
+    let invulnerable = false;
+    let invulTimer = 0;
+    let respawnPending = false;
+
     function preload() {
       const t = Date.now();
       this.load.image('spaceship', `spaceship.png?t=${t}`);
@@ -555,6 +563,9 @@
       createWave.call(this, 1);
       this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
       this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
+
+      // 生命數圖示（右上角顯示小戰機）
+      drawLives.call(this);
     }
 
     function createWave(waveNum) {
@@ -580,7 +591,7 @@
     }
 
     function shoot() {
-      if (gameOver) return;
+      if (gameOver || playerDead) return;
       const now = this.time.now;
       if (now - lastShot < 180) return;
 
@@ -620,6 +631,22 @@
     function update() {
       if (gameOver) return;
 
+      // 死亡時不能操控
+      if (playerDead) {
+        player.setVelocityX(0);
+        return;
+      }
+
+      // 無敵閃爍
+      if (invulnerable) {
+        invulTimer += this.game.loop.delta;
+        player.setAlpha(Math.sin(invulTimer * 0.015) > 0 ? 1 : 0.2);
+        if (invulTimer > 2500) {
+          invulnerable = false;
+          player.setAlpha(1);
+        }
+      }
+
       if (cursors.left.isDown) {
         player.setVelocityX(-220);
       } else if (cursors.right.isDown) {
@@ -640,11 +667,34 @@
           side = 'right';
         }
         if (inv.active && inv.y > 530) {
-          gameOver = true;
-          scoreText.setVisible(false);
-          
-          gameOverText.setVisible(true);
-          restartText.setVisible(true);
+          // 敵人到底 → 扣一條命，重置敵人到頂端
+          if (!gameOver && !playerDead) {
+            lives--;
+            drawLives.call(this);
+            if (lives <= 0) {
+              gameOver = true;
+              scoreText.setVisible(false);
+              gameOverText.setVisible(true);
+              restartText.setVisible(true);
+            } else {
+              // 重生並重置關卡
+              playerDead = true;
+              player.setVisible(false);
+              player.body.enable = false;
+              enemyBullets.getChildren().forEach(b => b.destroy());
+              createWave.call(this, wave);
+              this.time.delayedCall(1200, () => {
+                if (gameOver) return;
+                player.setPosition(400, 550);
+                player.setVisible(true);
+                player.body.enable = true;
+                playerDead = false;
+                invulnerable = true;
+                invulTimer = 0;
+              });
+            }
+          }
+          return; // 跳出迴圈，只處理一次
         }
       });
 
@@ -699,15 +749,61 @@
     }
 
     function hitPlayer(enemyBullet, playerSprite) {
+      if (invulnerable || gameOver) return;
       enemyBullet.destroy();
-      gameOver = true;
+      lives--;
+      drawLives.call(this);
+
+      // 爆炸動畫
       const exp = explosions.create(playerSprite.x, playerSprite.y);
       exp.setDisplaySize(48, 24);
       exp.play('explode');
-      scoreText.setVisible(false);
-      
-      gameOverText.setVisible(true);
-      restartText.setVisible(true);
+
+      if (lives <= 0) {
+        // 完全死亡 → Game Over
+        gameOver = true;
+        scoreText.setVisible(false);
+        gameOverText.setVisible(true);
+        restartText.setVisible(true);
+        playerSprite.setVisible(false);
+        // 清掉生命圖示
+        livesIcons.forEach(icon => icon.destroy());
+        livesIcons = [];
+      } else {
+        // 還有命 → 重生
+        playerDead = true;
+        respawnPending = true;
+        playerSprite.setVisible(false);
+        playerSprite.body.enable = false;
+
+        // 清除畫面中的敵人子彈
+        enemyBullets.getChildren().forEach(b => b.destroy());
+
+        // 1.2 秒後復活
+        this.time.delayedCall(1200, () => {
+          if (gameOver) return;
+          playerSprite.setPosition(400, 550);
+          playerSprite.setVisible(true);
+          playerSprite.body.enable = true;
+          playerDead = false;
+          respawnPending = false;
+          invulnerable = true;
+          invulTimer = 0;
+        });
+      }
+    }
+
+    // 繪製生命圖示（右上角小戰機）
+    function drawLives() {
+      // 清除舊的
+      livesIcons.forEach(icon => icon.destroy());
+      livesIcons = [];
+      for (let i = 0; i < lives; i++) {
+        const icon = this.add.sprite(780 - i * 38, 24, 'spaceship');
+        icon.setDisplaySize(24, 12);
+        icon.setAlpha(0.8);
+        livesIcons.push(icon);
+      }
     }
 
     window.addEventListener('keydown', e => {
