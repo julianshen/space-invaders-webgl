@@ -19,7 +19,7 @@
 
     if (!gl) alert('WebGL not supported');
 
-    // Audio (unchanged)
+    // Audio
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
       const osc = audioCtx.createOscillator();
@@ -114,24 +114,41 @@
     let keys = {};
     let lastShot = 0;
     let score = 0;
+    let gameOver = false;
 
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 8; col++) {
-        invaders.push({ x: 100 + col * 70, y: 80 + row * 50, w: 40, h: 30, alive: true });
+    function resetGame() {
+      player.x = 380;
+      invaders = [];
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 8; col++) {
+          invaders.push({ x: 100 + col * 70, y: 80 + row * 50, w: 40, h: 30, alive: true });
+        }
+      }
+      bullets = [];
+      score = 0;
+      gameOver = false;
+      updateScore();
+    }
+
+    function initInvaders() {
+      invaders = [];
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 8; col++) {
+          invaders.push({ x: 100 + col * 70, y: 80 + row * 50, w: 40, h: 30, alive: true });
+        }
       }
     }
+    initInvaders();
 
     let invaderDir = 1;
     let invaderSpeed = 1.5;
 
     function drawRect(x, y, w, h, color) {
-      // Fallback colored rect (for invaders/bullets)
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-      // Simple color shader fallback not used here
     }
 
     function drawTexturedRect(x, y, w, h, texture) {
@@ -139,14 +156,12 @@
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(textureLocation, 0);
 
-      // Position
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-      // Texcoords
       gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
       const texcoords = [0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
@@ -157,10 +172,16 @@
     }
 
     function updateScore() {
-      scoreEl.textContent = 'SCORE: ' + score.toString().padStart(5, '0');
+      if (gameOver) {
+        scoreEl.textContent = 'GAME OVER - PRESS SPACE TO RESTART';
+      } else {
+        scoreEl.textContent = 'SCORE: ' + score.toString().padStart(5, '0');
+      }
     }
 
     function update() {
+      if (gameOver) return;
+
       if (keys['ArrowLeft']) player.x = Math.max(0, player.x - 5);
       if (keys['ArrowRight']) player.x = Math.min(canvas.width - player.w, player.x + 5);
 
@@ -187,6 +208,15 @@
         for (let inv of invaders) if (inv.alive) inv.y += 18;
       }
 
+      // Check game over (invaders reach bottom)
+      for (let inv of invaders) {
+        if (inv.alive && inv.y + inv.h > player.y) {
+          gameOver = true;
+          updateScore();
+          return;
+        }
+      }
+
       for (let i = bullets.length - 1; i >= 0; i--) {
         for (let inv of invaders) {
           if (!inv.alive) continue;
@@ -207,15 +237,12 @@
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      // Player uses pixel art texture
       if (spaceshipTexture) {
         drawTexturedRect(player.x, player.y, player.w, player.h, spaceshipTexture);
       } else {
-        // Fallback while loading
         drawRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
       }
 
-      // Invaders and bullets still colored
       for (let inv of invaders) if (inv.alive) drawRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
       for (let b of bullets) drawRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
     }
@@ -226,12 +253,17 @@
       requestAnimationFrame(gameLoop);
     }
 
-    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (gameOver && e.key === ' ') {
+        resetGame();
+      }
+    });
     window.addEventListener('keyup', e => keys[e.key] = false);
 
     updateScore();
     gameLoop();
-    console.log('Space Invaders with pixel art spaceship texture ready!');
+    console.log('Space Invaders with restart (re-insert coin) ready!');
   </script>
 </body>
 </html>
