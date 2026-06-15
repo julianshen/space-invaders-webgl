@@ -43,7 +43,7 @@
       setTimeout(() => osc.stop(), 500);
     }
 
-    // Shaders same as before
+    // Shaders
     const vsSource = `
       attribute vec2 a_position;
       uniform vec2 u_resolution;
@@ -115,6 +115,17 @@
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
+    function drawPlayer(x, y) {
+      // Main body (dark green)
+      drawRect(x + 12, y + 4, 16, 12, [0.1, 0.6, 0.2]);
+      // Left wing
+      drawRect(x, y + 8, 14, 8, [0.0, 0.8, 0.3]);
+      // Right wing
+      drawRect(x + 26, y + 8, 14, 8, [0.0, 0.8, 0.3]);
+      // Cockpit highlight
+      drawRect(x + 17, y + 6, 6, 4, [0.6, 1.0, 0.6]);
+    }
+
     function updateScore() {
       scoreEl.textContent = 'SCORE: ' + score.toString().padStart(5, '0');
     }
@@ -166,7 +177,7 @@
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      drawRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
+      drawPlayer(player.x, player.y);
       for (let inv of invaders) if (inv.alive) drawRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
       for (let b of bullets) drawRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
     }
@@ -182,7 +193,7 @@
 
     updateScore();
     gameLoop();
-    console.log('Space Invaders with score + sound ready!');
+    console.log('Space Invaders with nicer ship ready!');
   </script>
 </body>
 </html>
