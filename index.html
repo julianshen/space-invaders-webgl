@@ -641,11 +641,20 @@
       // 死亡時不能操控
       if (playerDead) {
         try { player.setVelocityX(0); } catch(e) {
-          // player 掛了 → 強制重生命令
+          // player 掛了 → 強制重生並重建 sprite
           playerDead = false;
           invulnerable = true;
           invulTimer = 0;
-          deadUntil = 0;
+          deadUntil = Date.now() + 100;
+          // 重建 player sprite（原來的壞了）
+          if (typeof create === 'function') {
+            try {
+              player = this.physics.add.sprite(400, 550, 'spaceship');
+              player.setDisplaySize(48, 24);
+              player.setCollideWorldBounds(true);
+              this.physics.world.enable(player);
+            } catch(e2) {}
+          }
           console.warn('dead-recovery');
         }
         // 計時重生（不 return，讓 bounce/射擊邏輯繼續跑）
