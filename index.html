@@ -2,11 +2,11 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>Space Invaders - WebGL</title>
+  <title>Space Invaders - WebGL (90s Pixel Art)</title>
   <style>
     body { margin: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: #0f0; font-family: monospace; }
     #score { font-size: 24px; margin-bottom: 10px; }
-    canvas { border: 1px solid #0f0; }
+    canvas { border: 1px solid #0f0; image-rendering: pixelated; }
   </style>
 </head>
 <body>
@@ -18,6 +18,10 @@
     const scoreEl = document.getElementById('score');
 
     if (!gl) alert('WebGL not supported');
+
+    // Enable blending for transparent pixel art
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     // Audio
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -41,7 +45,7 @@
       setTimeout(() => osc.stop(), 500);
     }
 
-    // Color shader (for invaders, bullets)
+    // Color shader
     const colorVS = `
       attribute vec2 a_position;
       uniform vec2 u_resolution;
@@ -59,7 +63,7 @@
       }
     `;
 
-    // Texture shader (for player ship)
+    // Texture shader
     const texVS = `
       attribute vec2 a_position;
       attribute vec2 a_texcoord;
@@ -93,13 +97,11 @@
       return shader;
     }
 
-    // Color program
     const colorProgram = gl.createProgram();
     gl.attachShader(colorProgram, createShader(gl, gl.VERTEX_SHADER, colorVS));
     gl.attachShader(colorProgram, createShader(gl, gl.FRAGMENT_SHADER, colorFS));
     gl.linkProgram(colorProgram);
 
-    // Texture program
     const texProgram = gl.createProgram();
     gl.attachShader(texProgram, createShader(gl, gl.VERTEX_SHADER, texVS));
     gl.attachShader(texProgram, createShader(gl, gl.FRAGMENT_SHADER, texFS));
@@ -108,12 +110,10 @@
     const positionBuffer = gl.createBuffer();
     const texcoordBuffer = gl.createBuffer();
 
-    // Locations for color program
     const colorPositionLoc = gl.getAttribLocation(colorProgram, 'a_position');
     const colorResolutionLoc = gl.getUniformLocation(colorProgram, 'u_resolution');
     const colorColorLoc = gl.getUniformLocation(colorProgram, 'u_color');
 
-    // Locations for texture program
     const texPositionLoc = gl.getAttribLocation(texProgram, 'a_position');
     const texTexcoordLoc = gl.getAttribLocation(texProgram, 'a_texcoord');
     const texResolutionLoc = gl.getUniformLocation(texProgram, 'u_resolution');
@@ -122,7 +122,7 @@
     gl.uniform2f(colorResolutionLoc, canvas.width, canvas.height);
     gl.uniform2f(texResolutionLoc, canvas.width, canvas.height);
 
-    // Load pixel art spaceship texture
+    // Textures
     const spaceshipImg = new Image();
     spaceshipImg.src = 'spaceship.png';
     let spaceshipTexture = null;
@@ -136,10 +136,43 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     };
 
+    const invaderImg = new Image();
+    invaderImg.src = 'invader1.png';
+    let invaderTexture = null;
+    invaderImg.onload = () => {
+      invaderTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, invaderTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, invaderImg);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    };
+
+    const explosionImgs = [new Image(), new Image(), new Image()];
+    explosionImgs[0].src = 'explosion1.png';
+    explosionImgs[1].src = 'explosion2.png';
+    explosionImgs[2].src = 'explosion3.png';
+    let explosionTextures = [null, null, null];
+    let explosionsLoaded = 0;
+    explosionImgs.forEach((img, i) => {
+      img.onload = () => {
+        explosionTextures[i] = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, explosionTextures[i]);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        explosionsLoaded++;
+      };
+    });
+
     // Game state
     let player = { x: 380, y: 550, w: 40, h: 20 };
     let invaders = [];
     let bullets = [];
+    let explosions = []; // {x, y, frame, timer}
     let keys = {};
     let lastShot = 0;
     let score = 0;
@@ -154,6 +187,7 @@
         }
       }
       bullets = [];
+      explosions = [];
       score = 0;
       gameOver = false;
       updateScore();
@@ -259,8 +293,23 @@
             score += 100;
             updateScore();
             playSound('hit');
+
+            // Spawn explosion
+            explosions.push({ x: inv.x, y: inv.y, frame: 0, timer: 0 });
             break;
           }
+        }
+      }
+
+      // Update explosions
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        explosions[i].timer += 16;
+        if (explosions[i].timer > 100) {
+          explosions[i].frame++;
+          explosions[i].timer = 0;
+        }
+        if (explosions[i].frame >= 3) {
+          explosions.splice(i, 1);
         }
       }
     }
@@ -269,16 +318,36 @@
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      // Player uses pixel art texture
+      // Player
       if (spaceshipTexture) {
         drawTexturedRect(player.x, player.y, player.w, player.h, spaceshipTexture);
       } else {
         drawColoredRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
       }
 
-      // Invaders and bullets use colored rects
-      for (let inv of invaders) if (inv.alive) drawColoredRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
-      for (let b of bullets) drawColoredRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
+      // Invaders (use texture when loaded)
+      for (let inv of invaders) {
+        if (inv.alive) {
+          if (invaderTexture) {
+            drawTexturedRect(inv.x, inv.y, inv.w, inv.h, invaderTexture);
+          } else {
+            drawColoredRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
+          }
+        }
+      }
+
+      // Bullets
+      for (let b of bullets) {
+        drawColoredRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
+      }
+
+      // Explosions
+      for (let exp of explosions) {
+        const tex = explosionTextures[exp.frame];
+        if (tex) {
+          drawTexturedRect(exp.x, exp.y, 40, 30, tex);
+        }
+      }
     }
 
     function gameLoop() {
@@ -297,7 +366,7 @@
 
     updateScore();
     gameLoop();
-    console.log('Space Invaders fixed and playable!');
+    console.log('90s Pixel Art Space Invaders with explosions ready!');
   </script>
 </body>
 </html>
