@@ -99,7 +99,7 @@
       goOverlay.fillStyle(0x000000, 0.7);
       goOverlay.fillRect(0, 0, 800, 600);
       goOverlay.setVisible(false);
-      goOverlayRef = goOverlay;
+      window.goOverlayRef = goOverlay;
 
       gameOverText = this.add.text(400, 250, 'GAME OVER', {
         fontFamily: 'monospace',
@@ -217,7 +217,7 @@
         if (inv.active && inv.y > 530) {
           gameOver = true;
           scoreText.setVisible(false);
-          goOverlayRef.setVisible(true);
+          if (window.goOverlayRef) window.goOverlayRef.setVisible(true);
           gameOverText.setVisible(true);
           restartText.setVisible(true);
         }
@@ -280,7 +280,7 @@
       exp.setDisplaySize(48, 24);
       exp.play('explode');
       scoreText.setVisible(false);
-      goOverlayRef.setVisible(true);
+      if (window.goOverlayRef) window.goOverlayRef.setVisible(true);
       gameOverText.setVisible(true);
       restartText.setVisible(true);
     }
