@@ -134,6 +134,7 @@
       updateScoreText();
 
       const exp = explosions.create(invader.x, invader.y);
+      exp.setDisplaySize(42, 24);
       exp.play('explode');
 
       if (invaders.countActive(true) === 0) {
