@@ -640,9 +640,9 @@
 
       // 死亡時不能操控
       if (playerDead) {
-        player.setVelocityX(0);
+        if (player) player.setVelocityX(0);
         // 計時重生（不 return，讓 bounce/射擊邏輯繼續跑）
-        if (Date.now() >= deadUntil) {
+        if (player && Date.now() >= deadUntil) {
           player.setPosition(400, 550);
           player.setVisible(true);
           player.body.enable = true;
