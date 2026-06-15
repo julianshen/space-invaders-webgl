@@ -489,6 +489,7 @@
     let invulnerable = false;
     let invulTimer = 0;
     let respawnPending = false;
+    let deathTimer = 0;
 
     function preload() {
       const t = Date.now();
@@ -631,9 +632,19 @@
     function update() {
       if (gameOver) return;
 
-      // 死亡時不能操控
+      // 死亡時不能操控，但 countdown 重生
       if (playerDead) {
         player.setVelocityX(0);
+        deathTimer += this.game.loop.delta;
+        if (deathTimer >= 1200 && respawnPending) {
+          respawnPending = false;
+          player.setPosition(400, 550);
+          player.setVisible(true);
+          player.body.enable = true;
+          playerDead = false;
+          invulnerable = true;
+          invulTimer = 0;
+        }
         return;
       }
 
@@ -679,19 +690,11 @@
             } else {
               // 重生並重置關卡
               playerDead = true;
+              deathTimer = 0;
               player.setVisible(false);
               player.body.enable = false;
               enemyBullets.getChildren().forEach(b => b.destroy());
               createWave.call(this, wave);
-              this.time.delayedCall(1200, () => {
-                if (gameOver) return;
-                player.setPosition(400, 550);
-                player.setVisible(true);
-                player.body.enable = true;
-                playerDead = false;
-                invulnerable = true;
-                invulTimer = 0;
-              });
             }
           }
           return; // 跳出迴圈，只處理一次
@@ -773,23 +776,12 @@
         // 還有命 → 重生
         playerDead = true;
         respawnPending = true;
+        deathTimer = 0;
         playerSprite.setVisible(false);
         playerSprite.body.enable = false;
 
         // 清除畫面中的敵人子彈
         enemyBullets.getChildren().forEach(b => b.destroy());
-
-        // 1.2 秒後復活
-        this.time.delayedCall(1200, () => {
-          if (gameOver) return;
-          playerSprite.setPosition(400, 550);
-          playerSprite.setVisible(true);
-          playerSprite.body.enable = true;
-          playerDead = false;
-          respawnPending = false;
-          invulnerable = true;
-          invulTimer = 0;
-        });
       }
     }
 
