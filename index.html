@@ -630,6 +630,7 @@
 
     function update() {
       if (gameOver || !player) return;
+      try {
 
       // 死亡時不能操控
       if (playerDead) {
@@ -749,6 +750,7 @@
       enemyBullets.getChildren().forEach(b => {
         if (b.y > 600) b.destroy();
       });
+    } catch(e) { console.warn('update err:',e); }
     }
 
     function hitPlayer(enemyBullet, playerSprite) {
