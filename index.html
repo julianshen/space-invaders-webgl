@@ -488,8 +488,7 @@
     let playerDead = false;
     let invulnerable = false;
     let invulTimer = 0;
-    let respawnPending = false;
-    let deathTimer = 0;
+    let deadUntil = 0;
 
     function preload() {
       const t = Date.now();
@@ -632,12 +631,10 @@
     function update() {
       if (gameOver) return;
 
-      // 死亡時不能操控，但 countdown 重生
+      // 死亡時不能操控，用 Date.now() 算重生時間
       if (playerDead) {
         player.setVelocityX(0);
-        deathTimer += this.game.loop.delta;
-        if (deathTimer >= 1200 && respawnPending) {
-          respawnPending = false;
+        if (Date.now() >= deadUntil) {
           player.setPosition(400, 550);
           player.setVisible(true);
           player.body.enable = true;
@@ -690,7 +687,7 @@
             } else {
               // 重生並重置關卡
               playerDead = true;
-              deathTimer = 0;
+              deadUntil = Date.now() + 1200;
               player.setVisible(false);
               player.body.enable = false;
               enemyBullets.getChildren().forEach(b => b.destroy());
@@ -773,10 +770,9 @@
         livesIcons.forEach(icon => icon.destroy());
         livesIcons = [];
       } else {
-        // 還有命 → 重生
+        // 還有命 → 重生（用 Date.now() 計時）
         playerDead = true;
-        respawnPending = true;
-        deathTimer = 0;
+        deadUntil = Date.now() + 1200;
         playerSprite.setVisible(false);
         playerSprite.body.enable = false;
 
