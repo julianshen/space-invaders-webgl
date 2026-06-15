@@ -643,6 +643,7 @@
           invulnerable = true;
           invulTimer = 0;
         }
+        // 跳到 bounce/射擊邏輯（不提前 return）
       }
 
       if (!playerDead) {
@@ -751,7 +752,7 @@
     }
 
     function hitPlayer(enemyBullet, playerSprite) {
-      if (invulnerable || gameOver) return;
+      if (invulnerable || gameOver || playerDead) return;
       enemyBullet.destroy();
       lives--;
       drawLives.call(this);
