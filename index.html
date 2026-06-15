@@ -2,11 +2,11 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>Space Invaders - WebGL (90s Pixel Art)</title>
+  <title>Space Invaders - Canvas (90s Pixel Art)</title>
   <style>
     body { margin: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: #0f0; font-family: monospace; }
     #score { font-size: 24px; margin-bottom: 10px; }
-    canvas { border: 1px solid #0f0; image-rendering: pixelated; }
+    canvas { border: 1px solid #0f0; image-rendering: pixelated; background: #000; }
   </style>
 </head>
 <body>
@@ -14,19 +14,11 @@
   <canvas id="game" width="800" height="600"></canvas>
   <script>
     const canvas = document.getElementById('game');
-    const gl = canvas.getContext('webgl');
+    const ctx = canvas.getContext('2d', { alpha: true });
     const scoreEl = document.getElementById('score');
 
-    if (!gl) {
-      alert('WebGL not supported');
-      throw new Error('WebGL not supported');
-    }
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
+    // Audio
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
     function playSound(type) {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -47,137 +39,26 @@
       setTimeout(() => osc.stop(), 500);
     }
 
-    // Shaders
-    const colorVS = `
-      attribute vec2 a_position;
-      uniform vec2 u_resolution;
-      void main() {
-        vec2 zeroToOne = a_position / u_resolution;
-        vec2 clipSpace = zeroToOne * 2.0 - 1.0;
-        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-      }
-    `;
-    const colorFS = `
-      precision mediump float;
-      uniform vec4 u_color;
-      void main() {
-        gl_FragColor = u_color;
-      }
-    `;
+    // Load images
+    const images = {};
+    let imagesLoaded = 0;
+    const totalImages = 5;
 
-    const texVS = `
-      attribute vec2 a_position;
-      attribute vec2 a_texcoord;
-      uniform vec2 u_resolution;
-      varying vec2 v_texcoord;
-      void main() {
-        vec2 zeroToOne = a_position / u_resolution;
-        vec2 clipSpace = zeroToOne * 2.0 - 1.0;
-        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-        v_texcoord = a_texcoord;
-      }
-    `;
-    const texFS = `
-      precision mediump float;
-      varying vec2 v_texcoord;
-      uniform sampler2D u_texture;
-      void main() {
-        gl_FragColor = texture2D(u_texture, v_texcoord);
-      }
-    `;
-
-    function createShader(gl, type, source) {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-      }
-      return shader;
+    function loadImage(name, src) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        images[name] = img;
+        imagesLoaded++;
+      };
+      img.onerror = () => console.warn(`${src} failed to load`);
     }
 
-    function createProgram(gl, vs, fs) {
-      const program = gl.createProgram();
-      gl.attachShader(program, vs);
-      gl.attachShader(program, fs);
-      gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error('Program link error:', gl.getProgramInfoLog(program));
-        gl.deleteProgram(program);
-        return null;
-      }
-      return program;
-    }
-
-    const colorVertexShader = createShader(gl, gl.VERTEX_SHADER, colorVS);
-    const colorFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, colorFS);
-    const colorProgram = createProgram(gl, colorVertexShader, colorFragmentShader);
-
-    const texVertexShader = createShader(gl, gl.VERTEX_SHADER, texVS);
-    const texFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, texFS);
-    const texProgram = createProgram(gl, texVertexShader, texFragmentShader);
-
-    if (!colorProgram || !texProgram) {
-      alert('Failed to initialize WebGL programs');
-      throw new Error('WebGL program creation failed');
-    }
-
-    const positionBuffer = gl.createBuffer();
-    const texcoordBuffer = gl.createBuffer();
-
-    // Color program locations
-    const colorPositionLoc = gl.getAttribLocation(colorProgram, 'a_position');
-    const colorResolutionLoc = gl.getUniformLocation(colorProgram, 'u_resolution');
-    const colorColorLoc = gl.getUniformLocation(colorProgram, 'u_color');
-
-    // Texture program locations
-    const texPositionLoc = gl.getAttribLocation(texProgram, 'a_position');
-    const texTexcoordLoc = gl.getAttribLocation(texProgram, 'a_texcoord');
-    const texResolutionLoc = gl.getUniformLocation(texProgram, 'u_resolution');
-    const texTextureLoc = gl.getUniformLocation(texProgram, 'u_texture');
-
-    // Set resolution uniforms
-    gl.useProgram(colorProgram);
-    gl.uniform2f(colorResolutionLoc, canvas.width, canvas.height);
-
-    gl.useProgram(texProgram);
-    gl.uniform2f(texResolutionLoc, canvas.width, canvas.height);
-
-    // Textures
-    function loadTexture(img, callback) {
-      const tex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      callback(tex);
-    }
-
-    const spaceshipImg = new Image();
-    spaceshipImg.src = 'spaceship.png';
-    let spaceshipTexture = null;
-    spaceshipImg.onload = () => loadTexture(spaceshipImg, t => spaceshipTexture = t);
-    spaceshipImg.onerror = () => console.warn('spaceship.png failed to load');
-
-    const invaderImg = new Image();
-    invaderImg.src = 'invader1.png';
-    let invaderTexture = null;
-    invaderImg.onload = () => loadTexture(invaderImg, t => invaderTexture = t);
-    invaderImg.onerror = () => console.warn('invader1.png failed to load');
-
-    const explosionImgs = [new Image(), new Image(), new Image()];
-    explosionImgs[0].src = 'explosion1.png';
-    explosionImgs[1].src = 'explosion2.png';
-    explosionImgs[2].src = 'explosion3.png';
-    let explosionTextures = [null, null, null];
-    explosionImgs.forEach((img, i) => {
-      img.onload = () => loadTexture(img, t => explosionTextures[i] = t);
-      img.onerror = () => console.warn(`explosion${i+1}.png failed to load`);
-    });
+    loadImage('spaceship', 'spaceship.png');
+    loadImage('invader', 'invader1.png');
+    loadImage('explosion1', 'explosion1.png');
+    loadImage('explosion2', 'explosion2.png');
+    loadImage('explosion3', 'explosion3.png');
 
     // Game state
     let player = { x: 380, y: 550, w: 48, h: 24 };
@@ -208,7 +89,6 @@
           });
         }
       }
-      invaderSpeed = 1.2 + (waveNum - 1) * 0.25;
     }
 
     function resetGame() {
@@ -222,45 +102,10 @@
       updateScore();
     }
 
-    function initInvaders() {
-      createWave(1);
-    }
-    initInvaders();
+    createWave(1);
 
     let invaderDir = 1;
     let invaderSpeed = 1.5;
-
-    function drawColoredRect(x, y, w, h, color) {
-      gl.useProgram(colorProgram);
-      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-      const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(colorPositionLoc);
-      gl.vertexAttribPointer(colorPositionLoc, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform4f(colorColorLoc, color[0], color[1], color[2], 1.0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-    }
-
-    function drawTexturedRect(x, y, w, h, texture) {
-      if (!texture) return;
-      gl.useProgram(texProgram);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.uniform1i(texTextureLoc, 0);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-      const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(texPositionLoc);
-      gl.vertexAttribPointer(texPositionLoc, 2, gl.FLOAT, false, 0, 0);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-      const texcoords = [0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1];
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(texTexcoordLoc);
-      gl.vertexAttribPointer(texTexcoordLoc, 2, gl.FLOAT, false, 0, 0);
-
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-    }
 
     function updateScore() {
       if (gameOver) {
@@ -344,35 +189,46 @@
     }
 
     function render() {
-      gl.clearColor(0, 0, 0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if (spaceshipTexture) {
-        drawTexturedRect(player.x, player.y, player.w, player.h, spaceshipTexture);
+      // Player
+      if (images.spaceship) {
+        ctx.drawImage(images.spaceship, player.x, player.y, player.w, player.h);
       } else {
-        drawColoredRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(player.x, player.y, player.w, player.h);
       }
 
+      // Invaders
       for (let inv of invaders) {
         if (inv.alive) {
-          if (invaderTexture) {
-            drawTexturedRect(inv.x, inv.y, inv.w, inv.h, invaderTexture);
+          if (images.invader) {
+            ctx.drawImage(images.invader, inv.x, inv.y, inv.w, inv.h);
           } else {
-            drawColoredRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
+            ctx.fillStyle = '#f0f';
+            ctx.fillRect(inv.x, inv.y, inv.w, inv.h);
           }
         }
       }
 
+      // Bullets
+      ctx.fillStyle = '#fff';
       for (let b of bullets) {
-        drawColoredRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
+        ctx.fillRect(b.x, b.y, b.w, b.h);
       }
 
+      // Explosions
       for (let exp of explosions) {
-        const tex = explosionTextures[exp.frame];
-        if (tex) {
-          drawTexturedRect(exp.x, exp.y, 48, 32, tex);
+        const expImg = images[`explosion${exp.frame + 1}`];
+        if (expImg) {
+          ctx.drawImage(expImg, exp.x, exp.y, 48, 32);
         }
       }
+    }
+
+    function updateScoreDOM() {
+      updateScore();
     }
 
     function gameLoop(timestamp = 0) {
@@ -391,9 +247,17 @@
     });
     window.addEventListener('keyup', e => keys[e.key] = false);
 
-    updateScore();
-    console.log('Space Invaders with robust initialization ready!');
-    gameLoop();
+    function startGame() {
+      if (imagesLoaded < totalImages) {
+        setTimeout(startGame, 100);
+        return;
+      }
+      updateScoreDOM();
+      console.log('Canvas 2D Space Invaders ready!');
+      gameLoop();
+    }
+
+    startGame();
   </script>
 </body>
 </html>
