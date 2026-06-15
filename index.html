@@ -41,8 +41,26 @@
       setTimeout(() => osc.stop(), 500);
     }
 
-    // Texture shaders
-    const vsSource = `
+    // Color shader (for invaders, bullets)
+    const colorVS = `
+      attribute vec2 a_position;
+      uniform vec2 u_resolution;
+      void main() {
+        vec2 zeroToOne = a_position / u_resolution;
+        vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+      }
+    `;
+    const colorFS = `
+      precision mediump float;
+      uniform vec4 u_color;
+      void main() {
+        gl_FragColor = u_color;
+      }
+    `;
+
+    // Texture shader (for player ship)
+    const texVS = `
       attribute vec2 a_position;
       attribute vec2 a_texcoord;
       uniform vec2 u_resolution;
@@ -54,7 +72,7 @@
         v_texcoord = a_texcoord;
       }
     `;
-    const fsSource = `
+    const texFS = `
       precision mediump float;
       varying vec2 v_texcoord;
       uniform sampler2D u_texture;
@@ -75,23 +93,34 @@
       return shader;
     }
 
-    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.useProgram(program);
+    // Color program
+    const colorProgram = gl.createProgram();
+    gl.attachShader(colorProgram, createShader(gl, gl.VERTEX_SHADER, colorVS));
+    gl.attachShader(colorProgram, createShader(gl, gl.FRAGMENT_SHADER, colorFS));
+    gl.linkProgram(colorProgram);
 
-    const positionLocation = gl.getAttribLocation(program, 'a_position');
-    const texcoordLocation = gl.getAttribLocation(program, 'a_texcoord');
-    const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
-    const textureLocation = gl.getUniformLocation(program, 'u_texture');
+    // Texture program
+    const texProgram = gl.createProgram();
+    gl.attachShader(texProgram, createShader(gl, gl.VERTEX_SHADER, texVS));
+    gl.attachShader(texProgram, createShader(gl, gl.FRAGMENT_SHADER, texFS));
+    gl.linkProgram(texProgram);
 
     const positionBuffer = gl.createBuffer();
     const texcoordBuffer = gl.createBuffer();
 
-    gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+    // Locations for color program
+    const colorPositionLoc = gl.getAttribLocation(colorProgram, 'a_position');
+    const colorResolutionLoc = gl.getUniformLocation(colorProgram, 'u_resolution');
+    const colorColorLoc = gl.getUniformLocation(colorProgram, 'u_color');
+
+    // Locations for texture program
+    const texPositionLoc = gl.getAttribLocation(texProgram, 'a_position');
+    const texTexcoordLoc = gl.getAttribLocation(texProgram, 'a_texcoord');
+    const texResolutionLoc = gl.getUniformLocation(texProgram, 'u_resolution');
+    const texTextureLoc = gl.getUniformLocation(texProgram, 'u_texture');
+
+    gl.uniform2f(colorResolutionLoc, canvas.width, canvas.height);
+    gl.uniform2f(texResolutionLoc, canvas.width, canvas.height);
 
     // Load pixel art spaceship texture
     const spaceshipImg = new Image();
@@ -143,30 +172,34 @@
     let invaderDir = 1;
     let invaderSpeed = 1.5;
 
-    function drawRect(x, y, w, h, color) {
+    function drawColoredRect(x, y, w, h, color) {
+      gl.useProgram(colorProgram);
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(positionLocation);
-      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(colorPositionLoc);
+      gl.vertexAttribPointer(colorPositionLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform4f(colorColorLoc, color[0], color[1], color[2], 1.0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
     function drawTexturedRect(x, y, w, h, texture) {
       if (!texture) return;
+      gl.useProgram(texProgram);
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.uniform1i(textureLocation, 0);
+      gl.uniform1i(texTextureLoc, 0);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const vertices = [x, y, x + w, y, x, y + h, x, y + h, x + w, y, x + w, y + h];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(positionLocation);
-      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(texPositionLoc);
+      gl.vertexAttribPointer(texPositionLoc, 2, gl.FLOAT, false, 0, 0);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
       const texcoords = [0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(texcoordLocation);
-      gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(texTexcoordLoc);
+      gl.vertexAttribPointer(texTexcoordLoc, 2, gl.FLOAT, false, 0, 0);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -208,7 +241,6 @@
         for (let inv of invaders) if (inv.alive) inv.y += 18;
       }
 
-      // Check game over (invaders reach bottom)
       for (let inv of invaders) {
         if (inv.alive && inv.y + inv.h > player.y) {
           gameOver = true;
@@ -237,14 +269,16 @@
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
+      // Player uses pixel art texture
       if (spaceshipTexture) {
         drawTexturedRect(player.x, player.y, player.w, player.h, spaceshipTexture);
       } else {
-        drawRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
+        drawColoredRect(player.x, player.y, player.w, player.h, [0, 1, 0]);
       }
 
-      for (let inv of invaders) if (inv.alive) drawRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
-      for (let b of bullets) drawRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
+      // Invaders and bullets use colored rects
+      for (let inv of invaders) if (inv.alive) drawColoredRect(inv.x, inv.y, inv.w, inv.h, [1, 0, 0]);
+      for (let b of bullets) drawColoredRect(b.x, b.y, b.w, b.h, [1, 1, 1]);
     }
 
     function gameLoop() {
@@ -263,7 +297,7 @@
 
     updateScore();
     gameLoop();
-    console.log('Space Invaders with restart (re-insert coin) ready!');
+    console.log('Space Invaders fixed and playable!');
   </script>
 </body>
 </html>
