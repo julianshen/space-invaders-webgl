@@ -662,7 +662,7 @@
 
       if (!playerDead) {
         // 無敵閃爍
-        if (invulnerable) {
+        if (invulnerable && player) {
           invulTimer += this.game.loop.delta;
           player.setAlpha(Math.sin(invulTimer * 0.015) > 0 ? 1 : 0.2);
           if (invulTimer > 2500) {
@@ -672,11 +672,11 @@
         }
 
         if (cursors.left.isDown) {
-          player.setVelocityX(-220);
+          if (player) player.setVelocityX(-220);
         } else if (cursors.right.isDown) {
-          player.setVelocityX(220);
+          if (player) player.setVelocityX(220);
         } else {
-          player.setVelocityX(0);
+          if (player) player.setVelocityX(0);
         }
       }
 
