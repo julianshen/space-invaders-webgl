@@ -95,8 +95,12 @@
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const inv = invaders.create(startX + col * spacingX, 90 + row * 55, 'invader');
-          inv.setDisplaySize(42, 24);           // 強制設定尺寸
-          inv.setVelocityX(invaderSpeed + (waveNum - 1) * 18);
+          inv.setDisplaySize(42, 24);
+          // 隨機初始方向，讓敵人不會全部同方向移動
+          const dir = (Math.random() > 0.5) ? 1 : -1;
+          inv.setVelocityX((invaderSpeed + (waveNum - 1) * 18) * dir);
+          // 記錄每隻敵人的原始 row，用來做階梯式掉落
+          inv.setData('row', row);
         }
       }
     }
@@ -150,9 +154,15 @@
       }
 
       let bounce = false;
+      let side = 'none';
       invaders.getChildren().forEach(inv => {
-        if (inv.active && (inv.x < 40 || inv.x > 760)) {
+        if (inv.active && inv.x < 40) {
           bounce = true;
+          side = 'left';
+        }
+        if (inv.active && inv.x > 760) {
+          bounce = true;
+          side = 'right';
         }
         if (inv.active && inv.y > 530) {
           gameOver = true;
@@ -163,8 +173,15 @@
       if (bounce) {
         invaders.getChildren().forEach(inv => {
           if (inv.active) {
-            inv.setVelocityX(inv.body.velocity.x * -1);
-            inv.y += 12;
+            // 反彈後速度稍微加快（越打越快）
+            const currentSpeed = Math.abs(inv.body.velocity.x);
+            const newSpeed = Math.min(currentSpeed + 6, 280);
+            const dir = side === 'left' ? 1 : -1;
+            inv.setVelocityX(newSpeed * dir);
+            // 階梯式掉落：後排掉得少，前排掉得多
+            const row = inv.getData('row') || 0;
+            const dropAmount = 8 + row * 2 + Math.floor(Math.random() * 4);
+            inv.y += dropAmount;
           }
         });
       }
