@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>Space Invaders - Phaser</title>
+  <title>Space Invaders</title>
   <style>
     body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
     canvas { image-rendering: pixelated; }
@@ -19,9 +19,7 @@
       pixelArt: true,
       physics: {
         default: 'arcade',
-        arcade: {
-          debug: false
-        }
+        arcade: { debug: false }
       },
       scene: {
         preload: preload,
@@ -42,6 +40,7 @@
     let scoreText;
     let gameOver = false;
     let lastShot = 0;
+    let invaderSpeed = 80;
 
     function preload() {
       this.load.image('spaceship', 'spaceship.png');
@@ -65,15 +64,27 @@
       explosions = this.add.group();
 
       // Score
-      scoreText = this.add.text(16, 16, 'WAVE 1  SCORE: 00000', {
+      scoreText = this.add.text(16, 16, 'WAVE 1   SCORE: 00000', {
         fontFamily: 'monospace',
-        fontSize: '24px',
+        fontSize: '22px',
         color: '#00ff00'
+      });
+
+      // Explosion animation
+      this.anims.create({
+        key: 'explode',
+        frames: [
+          { key: 'explosion1' },
+          { key: 'explosion2' },
+          { key: 'explosion3' }
+        ],
+        frameRate: 12,
+        hideOnComplete: true
       });
 
       createWave.call(this, 1);
 
-      // Collisions
+      // Collision
       this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
     }
 
@@ -82,12 +93,11 @@
 
       const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
       const cols = 8;
-      const startY = 80 + (waveNum - 1) * 15;
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          const inv = invaders.create(100 + col * 80, startY + row * 50, 'invader');
-          inv.setVelocityX(80 + waveNum * 15);
+          const inv = invaders.create(100 + col * 80, 90 + row * 55, 'invader');
+          inv.setVelocityX(invaderSpeed + (waveNum - 1) * 20);
         }
       }
     }
@@ -95,15 +105,15 @@
     function shoot() {
       if (gameOver) return;
       const now = this.time.now;
-      if (now - lastShot < 200) return;
+      if (now - lastShot < 180) return;
 
-      const bullet = bullets.create(player.x, player.y - 20, 'bullet');
+      const bullet = bullets.create(player.x, player.y - 10, 'bullet');
       if (bullet) {
-        bullet.setVelocityY(-400);
+        bullet.setVelocityY(-450);
         bullet.setSize(4, 10);
+        bullet.setDisplaySize(4, 10);
       }
       lastShot = now;
-      // playSound('shoot'); // 可之後加上
     }
 
     function hitInvader(bullet, invader) {
@@ -113,25 +123,21 @@
       score += 100;
       updateScoreText();
 
-      // Explosion
-      const exp = explosions.create(invader.x, invader.y, 'explosion1');
-      exp.play({ key: 'explode', repeat: 0 });
-      this.time.delayedCall(300, () => {
-        if (exp) exp.destroy();
-      });
+      const exp = explosions.create(invader.x, invader.y);
+      exp.play('explode');
 
       // Check wave clear
       if (invaders.countActive(true) === 0) {
         wave++;
         updateScoreText();
-        this.time.delayedCall(800, () => {
+        this.time.delayedCall(700, () => {
           createWave.call(this, wave);
         });
       }
     }
 
     function updateScoreText() {
-      scoreText.setText(`WAVE ${wave}  SCORE: ${score.toString().padStart(5, '0')}`);
+      scoreText.setText(`WAVE ${wave}   SCORE: ${score.toString().padStart(5, '0')}`);
     }
 
     function update() {
@@ -139,22 +145,22 @@
 
       // Player movement
       if (cursors.left.isDown) {
-        player.setVelocityX(-200);
+        player.setVelocityX(-220);
       } else if (cursors.right.isDown) {
-        player.setVelocityX(200);
+        player.setVelocityX(220);
       } else {
         player.setVelocityX(0);
       }
 
-      // Invader edge bounce
+      // Invader edge bounce + drop
       let bounce = false;
       invaders.getChildren().forEach(inv => {
-        if (inv.active) {
-          if (inv.x < 30 || inv.x > 770) bounce = true;
-          if (inv.y > 520) {
-            gameOver = true;
-            scoreText.setText(`WAVE ${wave} - GAME OVER - PRESS SPACE`);
-          }
+        if (inv.active && (inv.x < 40 || inv.x > 760)) {
+          bounce = true;
+        }
+        if (inv.active && inv.y > 530) {
+          gameOver = true;
+          scoreText.setText(`WAVE ${wave} - GAME OVER - PRESS SPACE`);
         }
       });
 
@@ -162,12 +168,12 @@
         invaders.getChildren().forEach(inv => {
           if (inv.active) {
             inv.setVelocityX(inv.body.velocity.x * -1);
-            inv.y += 20;
+            inv.y += 22;
           }
         });
       }
 
-      // Clean bullets
+      // Clean off-screen bullets
       bullets.getChildren().forEach(b => {
         if (b.y < 0) b.destroy();
       });
