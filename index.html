@@ -489,6 +489,7 @@
     let invulnerable = false;
     let invulTimer = 0;
     let deadUntil = 0;
+    let gameReady = false;
 
     function preload() {
       const t = Date.now();
@@ -566,6 +567,7 @@
 
       // 生命數圖示（右上角顯示小戰機）
       drawLives.call(this);
+      gameReady = true;
     }
 
     function createWave(waveNum) {
@@ -633,7 +635,7 @@
     }
 
     function update() {
-      if (gameOver || !player) return;
+      if (gameOver || !player || !gameReady) return;
       try {
 
       // 死亡時不能操控
