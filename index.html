@@ -45,8 +45,10 @@
     let lastEnemyShot = 0;
     let gameOverText;
     let restartText;
+    let goOverlayRef;
     let gameOverText;
     let restartText;
+    let goOverlayRef;
 
     function preload() {
       const t = Date.now();
@@ -97,7 +99,7 @@
       goOverlay.fillStyle(0x000000, 0.7);
       goOverlay.fillRect(0, 0, 800, 600);
       goOverlay.setVisible(false);
-      this.goOverlay = goOverlay;
+      goOverlayRef = goOverlay;
 
       gameOverText = this.add.text(400, 250, 'GAME OVER', {
         fontFamily: 'monospace',
@@ -215,7 +217,7 @@
         if (inv.active && inv.y > 530) {
           gameOver = true;
           scoreText.setVisible(false);
-          this.goOverlay.setVisible(true);
+          goOverlayRef.setVisible(true);
           gameOverText.setVisible(true);
           restartText.setVisible(true);
         }
@@ -278,7 +280,7 @@
       exp.setDisplaySize(48, 24);
       exp.play('explode');
       scoreText.setVisible(false);
-      this.goOverlay.setVisible(true);
+      goOverlayRef.setVisible(true);
       gameOverText.setVisible(true);
       restartText.setVisible(true);
     }
