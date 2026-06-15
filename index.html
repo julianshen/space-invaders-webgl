@@ -43,11 +43,12 @@
     let invaderSpeed = 80;
 
     function preload() {
-      this.load.image('spaceship', 'spaceship.png');
-      this.load.image('invader', 'invader1.png');
-      this.load.image('explosion1', 'explosion1.png');
-      this.load.image('explosion2', 'explosion2.png');
-      this.load.image('explosion3', 'explosion3.png');
+      const t = Date.now();
+      this.load.image('spaceship', `spaceship.png?t=${t}`);
+      this.load.image('invader', `invader1.png?t=${t}`);
+      this.load.image('explosion1', `explosion1.png?t=${t}`);
+      this.load.image('explosion2', `explosion2.png?t=${t}`);
+      this.load.image('explosion3', `explosion3.png?t=${t}`);
     }
 
     function create() {
