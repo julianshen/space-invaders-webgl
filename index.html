@@ -123,13 +123,13 @@
     spaceshipImg.src = 'spaceship.png';
     let spaceshipTexture = null;
     spaceshipImg.onload = () => { loadTexture(spaceshipImg, t => spaceshipTexture = t); };
-    spaceshipImg.onerror = () => console.warn('spaceship.png failed to load');
+    spaceshipImg.onerror = () => console.warn('spaceship.png failed');
 
     const invaderImg = new Image();
     invaderImg.src = 'invader1.png';
     let invaderTexture = null;
     invaderImg.onload = () => { loadTexture(invaderImg, t => invaderTexture = t); };
-    invaderImg.onerror = () => console.warn('invader1.png failed to load');
+    invaderImg.onerror = () => console.warn('invader1.png failed');
 
     const explosionImgs = [new Image(), new Image(), new Image()];
     explosionImgs[0].src = 'explosion1.png';
@@ -138,7 +138,7 @@
     let explosionTextures = [null, null, null];
     explosionImgs.forEach((img, i) => {
       img.onload = () => { loadTexture(img, t => explosionTextures[i] = t); };
-      img.onerror = () => console.warn(`explosion${i+1}.png failed to load`);
+      img.onerror = () => console.warn(`explosion${i+1}.png failed`);
     });
 
     function loadTexture(img, callback) {
@@ -153,7 +153,7 @@
     }
 
     // Game state
-    let player = { x: 380, y: 550, w: 40, h: 20 };
+    let player = { x: 380, y: 550, w: 48, h: 24 };
     let invaders = [];
     let bullets = [];
     let explosions = [];
@@ -161,16 +161,33 @@
     let lastShot = 0;
     let score = 0;
     let gameOver = false;
+    let wave = 1;
     let lastTime = 0;
+
+    function createWave(waveNum) {
+      invaders = [];
+      const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
+      const cols = 8;
+      const startY = 60 + (waveNum - 1) * 10;
+
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          invaders.push({
+            x: 80 + col * 80,
+            y: startY + row * 45,
+            w: 48,
+            h: 24,
+            alive: true
+          });
+        }
+      }
+      invaderSpeed = 1.2 + (waveNum - 1) * 0.25;
+    }
 
     function resetGame() {
       player.x = 380;
-      invaders = [];
-      for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 8; col++) {
-          invaders.push({ x: 100 + col * 70, y: 80 + row * 50, w: 40, h: 30, alive: true });
-        }
-      }
+      wave = 1;
+      createWave(wave);
       bullets = [];
       explosions = [];
       score = 0;
@@ -179,12 +196,7 @@
     }
 
     function initInvaders() {
-      invaders = [];
-      for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 8; col++) {
-          invaders.push({ x: 100 + col * 70, y: 80 + row * 50, w: 40, h: 30, alive: true });
-        }
-      }
+      createWave(1);
     }
     initInvaders();
 
@@ -225,9 +237,9 @@
 
     function updateScore() {
       if (gameOver) {
-        scoreEl.textContent = 'GAME OVER - PRESS SPACE TO RESTART';
+        scoreEl.textContent = `WAVE ${wave} - GAME OVER - PRESS SPACE`;
       } else {
-        scoreEl.textContent = 'SCORE: ' + score.toString().padStart(5, '0');
+        scoreEl.textContent = `WAVE ${wave}  SCORE: ${score.toString().padStart(5, '0')}`;
       }
     }
 
@@ -238,14 +250,14 @@
       if (keys['ArrowRight']) player.x = Math.min(canvas.width - player.w, player.x + 5);
 
       const now = Date.now();
-      if (keys[' '] && now - lastShot > 250) {
+      if (keys[' '] && now - lastShot > 200) {
         bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, w: 4, h: 10 });
         playSound('shoot');
         lastShot = now;
       }
 
       for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].y -= 9;
+        bullets[i].y -= 10;
         if (bullets[i].y < 0) bullets.splice(i, 1);
       }
 
@@ -257,7 +269,7 @@
       }
       if (edgeHit) {
         invaderDir *= -1;
-        for (let inv of invaders) if (inv.alive) inv.y += 18;
+        for (let inv of invaders) if (inv.alive) inv.y += 20;
       }
 
       for (let inv of invaders) {
@@ -284,10 +296,19 @@
         }
       }
 
-      // Explosion animation with delta time
+      // Check for wave clear
+      const aliveInvaders = invaders.filter(i => i.alive).length;
+      if (aliveInvaders === 0) {
+        wave++;
+        createWave(wave);
+        invaderDir = 1;
+        updateScore();
+      }
+
+      // Explosion animation
       for (let i = explosions.length - 1; i >= 0; i--) {
         explosions[i].timer += dt;
-        if (explosions[i].timer > 120) {
+        if (explosions[i].timer > 80) {
           explosions[i].frame++;
           explosions[i].timer = 0;
         }
@@ -324,7 +345,7 @@
       for (let exp of explosions) {
         const tex = explosionTextures[exp.frame];
         if (tex) {
-          drawTexturedRect(exp.x, exp.y, 40, 30, tex);
+          drawTexturedRect(exp.x, exp.y, 48, 32, tex);
         }
       }
     }
@@ -347,7 +368,7 @@
 
     updateScore();
     gameLoop();
-    console.log('90s Pixel Art Space Invaders - improved version ready!');
+    console.log('Space Invaders with waves + faster explosions ready!');
   </script>
 </body>
 </html>
