@@ -2,262 +2,183 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>Space Invaders - Canvas (90s Pixel Art)</title>
+  <title>Space Invaders - Phaser</title>
   <style>
-    body { margin: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: #0f0; font-family: monospace; }
-    #score { font-size: 24px; margin-bottom: 10px; }
-    canvas { border: 1px solid #0f0; image-rendering: pixelated; background: #000; }
+    body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { image-rendering: pixelated; }
   </style>
 </head>
 <body>
-  <div id="score">SCORE: 00000</div>
-  <canvas id="game" width="800" height="600"></canvas>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d', { alpha: true });
-    const scoreEl = document.getElementById('score');
-
-    // Audio
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playSound(type) {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      if (type === 'shoot') {
-        osc.frequency.value = 660;
-        osc.type = 'triangle';
-        gain.gain.value = 0.2;
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.12);
-      } else if (type === 'hit') {
-        osc.frequency.value = 180;
-        osc.type = 'sine';
-        gain.gain.value = 0.35;
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.35);
+    const config = {
+      type: Phaser.AUTO,
+      width: 800,
+      height: 600,
+      backgroundColor: '#000000',
+      pixelArt: true,
+      physics: {
+        default: 'arcade',
+        arcade: {
+          debug: false
+        }
+      },
+      scene: {
+        preload: preload,
+        create: create,
+        update: update
       }
-      osc.start();
-      setTimeout(() => osc.stop(), 500);
-    }
+    };
 
-    // Load images
-    const images = {};
-    let imagesLoaded = 0;
-    const totalImages = 5;
+    const game = new Phaser.Game(config);
 
-    function loadImage(name, src) {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        images[name] = img;
-        imagesLoaded++;
-      };
-      img.onerror = () => console.warn(`${src} failed to load`);
-    }
-
-    loadImage('spaceship', 'spaceship.png');
-    loadImage('invader', 'invader1.png');
-    loadImage('explosion1', 'explosion1.png');
-    loadImage('explosion2', 'explosion2.png');
-    loadImage('explosion3', 'explosion3.png');
-
-    // Game state
-    let player = { x: 380, y: 550, w: 48, h: 24 };
-    let invaders = [];
-    let bullets = [];
-    let explosions = [];
-    let keys = {};
-    let lastShot = 0;
+    let player;
+    let cursors;
+    let bullets;
+    let invaders;
+    let explosions;
     let score = 0;
-    let gameOver = false;
     let wave = 1;
-    let lastTime = 0;
+    let scoreText;
+    let gameOver = false;
+    let lastShot = 0;
+
+    function preload() {
+      this.load.image('spaceship', 'spaceship.png');
+      this.load.image('invader', 'invader1.png');
+      this.load.image('explosion1', 'explosion1.png');
+      this.load.image('explosion2', 'explosion2.png');
+      this.load.image('explosion3', 'explosion3.png');
+    }
+
+    function create() {
+      // Player
+      player = this.physics.add.sprite(400, 550, 'spaceship');
+      player.setCollideWorldBounds(true);
+
+      cursors = this.input.keyboard.createCursorKeys();
+      this.input.keyboard.on('keydown-SPACE', shoot, this);
+
+      // Groups
+      bullets = this.physics.add.group();
+      invaders = this.physics.add.group();
+      explosions = this.add.group();
+
+      // Score
+      scoreText = this.add.text(16, 16, 'WAVE 1  SCORE: 00000', {
+        fontFamily: 'monospace',
+        fontSize: '24px',
+        color: '#00ff00'
+      });
+
+      createWave.call(this, 1);
+
+      // Collisions
+      this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
+    }
 
     function createWave(waveNum) {
-      invaders = [];
+      invaders.clear(true, true);
+
       const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
       const cols = 8;
-      const startY = 60 + (waveNum - 1) * 10;
+      const startY = 80 + (waveNum - 1) * 15;
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          invaders.push({
-            x: 80 + col * 80,
-            y: startY + row * 45,
-            w: 48,
-            h: 24,
-            alive: true
-          });
+          const inv = invaders.create(100 + col * 80, startY + row * 50, 'invader');
+          inv.setVelocityX(80 + waveNum * 15);
         }
       }
     }
 
-    function resetGame() {
-      player.x = 380;
-      wave = 1;
-      createWave(wave);
-      bullets = [];
-      explosions = [];
-      score = 0;
-      gameOver = false;
-      updateScore();
+    function shoot() {
+      if (gameOver) return;
+      const now = this.time.now;
+      if (now - lastShot < 200) return;
+
+      const bullet = bullets.create(player.x, player.y - 20, 'bullet');
+      if (bullet) {
+        bullet.setVelocityY(-400);
+        bullet.setSize(4, 10);
+      }
+      lastShot = now;
+      // playSound('shoot'); // 可之後加上
     }
 
-    createWave(1);
+    function hitInvader(bullet, invader) {
+      bullet.destroy();
+      invader.destroy();
 
-    let invaderDir = 1;
-    let invaderSpeed = 1.5;
+      score += 100;
+      updateScoreText();
 
-    function updateScore() {
-      if (gameOver) {
-        scoreEl.textContent = `WAVE ${wave} - GAME OVER - PRESS SPACE`;
-      } else {
-        scoreEl.textContent = `WAVE ${wave}  SCORE: ${score.toString().padStart(5, '0')}`;
+      // Explosion
+      const exp = explosions.create(invader.x, invader.y, 'explosion1');
+      exp.play({ key: 'explode', repeat: 0 });
+      this.time.delayedCall(300, () => {
+        if (exp) exp.destroy();
+      });
+
+      // Check wave clear
+      if (invaders.countActive(true) === 0) {
+        wave++;
+        updateScoreText();
+        this.time.delayedCall(800, () => {
+          createWave.call(this, wave);
+        });
       }
     }
 
-    function update(dt) {
+    function updateScoreText() {
+      scoreText.setText(`WAVE ${wave}  SCORE: ${score.toString().padStart(5, '0')}`);
+    }
+
+    function update() {
       if (gameOver) return;
 
-      if (keys['ArrowLeft']) player.x = Math.max(0, player.x - 5);
-      if (keys['ArrowRight']) player.x = Math.min(canvas.width - player.w, player.x + 5);
-
-      const now = Date.now();
-      if (keys[' '] && now - lastShot > 200) {
-        bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, w: 4, h: 10 });
-        playSound('shoot');
-        lastShot = now;
-      }
-
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].y -= 10;
-        if (bullets[i].y < 0) bullets.splice(i, 1);
-      }
-
-      let edgeHit = false;
-      for (let inv of invaders) {
-        if (!inv.alive) continue;
-        inv.x += invaderDir * invaderSpeed;
-        if (inv.x < 0 || inv.x + inv.w > canvas.width) edgeHit = true;
-      }
-      if (edgeHit) {
-        invaderDir *= -1;
-        for (let inv of invaders) if (inv.alive) inv.y += 20;
-      }
-
-      for (let inv of invaders) {
-        if (inv.alive && inv.y + inv.h > player.y) {
-          gameOver = true;
-          updateScore();
-          return;
-        }
-      }
-
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        for (let inv of invaders) {
-          if (!inv.alive) continue;
-          if (bullets[i].x < inv.x + inv.w && bullets[i].x + bullets[i].w > inv.x &&
-              bullets[i].y < inv.y + inv.h && bullets[i].y + bullets[i].h > inv.y) {
-            inv.alive = false;
-            bullets.splice(i, 1);
-            score += 100;
-            updateScore();
-            playSound('hit');
-            explosions.push({ x: inv.x, y: inv.y, frame: 0, timer: 0 });
-            break;
-          }
-        }
-      }
-
-      const aliveInvaders = invaders.filter(i => i.alive).length;
-      if (aliveInvaders === 0) {
-        wave++;
-        createWave(wave);
-        invaderDir = 1;
-        updateScore();
-      }
-
-      for (let i = explosions.length - 1; i >= 0; i--) {
-        explosions[i].timer += dt;
-        if (explosions[i].timer > 80) {
-          explosions[i].frame++;
-          explosions[i].timer = 0;
-        }
-        if (explosions[i].frame >= 3) {
-          explosions.splice(i, 1);
-        }
-      }
-    }
-
-    function render() {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Player
-      if (images.spaceship) {
-        ctx.drawImage(images.spaceship, player.x, player.y, player.w, player.h);
+      // Player movement
+      if (cursors.left.isDown) {
+        player.setVelocityX(-200);
+      } else if (cursors.right.isDown) {
+        player.setVelocityX(200);
       } else {
-        ctx.fillStyle = '#0f0';
-        ctx.fillRect(player.x, player.y, player.w, player.h);
+        player.setVelocityX(0);
       }
 
-      // Invaders
-      for (let inv of invaders) {
-        if (inv.alive) {
-          if (images.invader) {
-            ctx.drawImage(images.invader, inv.x, inv.y, inv.w, inv.h);
-          } else {
-            ctx.fillStyle = '#f0f';
-            ctx.fillRect(inv.x, inv.y, inv.w, inv.h);
+      // Invader edge bounce
+      let bounce = false;
+      invaders.getChildren().forEach(inv => {
+        if (inv.active) {
+          if (inv.x < 30 || inv.x > 770) bounce = true;
+          if (inv.y > 520) {
+            gameOver = true;
+            scoreText.setText(`WAVE ${wave} - GAME OVER - PRESS SPACE`);
           }
         }
+      });
+
+      if (bounce) {
+        invaders.getChildren().forEach(inv => {
+          if (inv.active) {
+            inv.setVelocityX(inv.body.velocity.x * -1);
+            inv.y += 20;
+          }
+        });
       }
 
-      // Bullets
-      ctx.fillStyle = '#fff';
-      for (let b of bullets) {
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-      }
-
-      // Explosions
-      for (let exp of explosions) {
-        const expImg = images[`explosion${exp.frame + 1}`];
-        if (expImg) {
-          ctx.drawImage(expImg, exp.x, exp.y, 48, 32);
-        }
-      }
+      // Clean bullets
+      bullets.getChildren().forEach(b => {
+        if (b.y < 0) b.destroy();
+      });
     }
 
-    function updateScoreDOM() {
-      updateScore();
-    }
-
-    function gameLoop(timestamp = 0) {
-      const dt = timestamp - lastTime;
-      lastTime = timestamp;
-      update(dt || 16);
-      render();
-      requestAnimationFrame(gameLoop);
-    }
-
+    // Restart
     window.addEventListener('keydown', e => {
-      keys[e.key] = true;
       if (gameOver && e.key === ' ') {
-        resetGame();
+        location.reload();
       }
     });
-    window.addEventListener('keyup', e => keys[e.key] = false);
-
-    function startGame() {
-      if (imagesLoaded < totalImages) {
-        setTimeout(startGame, 100);
-        return;
-      }
-      updateScoreDOM();
-      console.log('Canvas 2D Space Invaders ready!');
-      gameLoop();
-    }
-
-    startGame();
   </script>
 </body>
 </html>
