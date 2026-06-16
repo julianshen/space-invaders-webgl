@@ -445,6 +445,227 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
   <script>
+  // ====================
+  // SoundManager — Web Audio API
+  // 現代感的音效設計，不刺耳
+  // ====================
+  const SoundManager = {
+    ctx: null,
+    masterGain: null,
+    inited: false,
+
+    init() {
+      if (this.inited) return;
+      try {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.35;
+        this.masterGain.connect(this.ctx.destination);
+        this.inited = true;
+      } catch(e) {
+        console.warn('SoundManager: AudioContext not available');
+      }
+    },
+
+    resume() {
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+    },
+
+    // 工具：建立過濾器 + gain 節點鏈
+    _chain(filterOpts, gainVal) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = filterOpts.type || 'lowpass';
+      filter.frequency.value = filterOpts.freq || 1000;
+      filter.Q.value = filterOpts.Q || 1;
+      const gain = this.ctx.createGain();
+      gain.gain.value = gainVal ?? 0.3;
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      return { filter, gain };
+    },
+
+    // 工具：播放 oscillator + noise 混合
+    _playOsc(type, freq, duration, filterOpts, vol) {
+      const osc = this.ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      const { filter, gain } = this._chain(filterOpts, vol);
+      osc.connect(filter);
+      gain.gain.setValueAtTime(vol ?? 0.3, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+      osc.start(this.ctx.currentTime);
+      osc.stop(this.ctx.currentTime + duration);
+      return { osc, gain, filter };
+    },
+
+    // 工具：白噪音 burst
+    _playNoise(duration, filterOpts, vol) {
+      const bufLen = Math.floor(this.ctx.sampleRate * duration);
+      const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const { filter, gain } = this._chain(filterOpts, vol);
+      src.connect(filter);
+      gain.gain.setValueAtTime(vol ?? 0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+      src.start(this.ctx.currentTime);
+      src.stop(this.ctx.currentTime + duration);
+      return { src, gain, filter };
+    },
+
+    sounds: {
+      // === koi可愛光波 — 溫和射擊音效 ===
+      shoot() {
+        const ctx = SoundManager.ctx;
+        if (!ctx) return;
+        // 三角波為主，溫暖不刺耳
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.06);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 900;
+        filter.Q.value = 2;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(SoundManager.masterGain);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+
+        // 加一點點高頻 sparkle（sine 泛音）
+        const sparkle = ctx.createOscillator();
+        sparkle.type = 'sine';
+        sparkle.frequency.setValueAtTime(1800, ctx.currentTime);
+        sparkle.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.04);
+
+        const sparkGain = ctx.createGain();
+        sparkGain.gain.setValueAtTime(0.08, ctx.currentTime);
+        sparkGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+        sparkle.connect(sparkGain);
+        sparkGain.connect(SoundManager.masterGain);
+        sparkle.start(ctx.currentTime);
+        sparkle.stop(ctx.currentTime + 0.1);
+      },
+
+      // === 敵人爆炸 — 低頻碰聲 ===
+      explosion() {
+        const ctx = SoundManager.ctx;
+        if (!ctx) return;
+        // 低頻 thud
+        SoundManager._playOsc('sine', 150, 0.15, { type: 'lowpass', freq: 400, Q: 1 }, 0.2);
+        // 噪音 burst
+        SoundManager._playNoise(0.12, { type: 'lowpass', freq: 800, Q: 1 }, 0.12);
+      },
+
+      // === 玩家受傷 — 較沉的下降音 ===
+      playerHit() {
+        const ctx = SoundManager.ctx;
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(350, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.35);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 500;
+        filter.Q.value = 1.5;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(SoundManager.masterGain);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+
+        // 加噪音
+        SoundManager._playNoise(0.3, { type: 'lowpass', freq: 300, Q: 1 }, 0.1);
+      },
+
+      // === Game Over — 緩慢下降 ===
+      gameOver() {
+        const ctx = SoundManager.ctx;
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 1.5);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 1.5);
+        filter.Q.value = 2;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(SoundManager.masterGain);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 2);
+      },
+
+      // === 波次完成 — 上升音階 ===
+      waveComplete() {
+        const ctx = SoundManager.ctx;
+        if (!ctx) return;
+        [523, 659, 784].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + i * 0.12;
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.2, t + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = freq * 1.5;
+          filter.Q.value = 3;
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(SoundManager.masterGain);
+          osc.start(t);
+          osc.stop(t + 0.25);
+        });
+      }
+    },
+
+    play(name) {
+      this.init();
+      this.resume();
+      // 若 context 剛 resume 還 suspended，排程播放靠 keydown 預熱 cover
+      if (this.ctx && this.sounds[name]) {
+        this.sounds[name]();
+      }
+    }
+  };
+  </script>
+  <script>
     const config = {
       type: Phaser.AUTO,
       width: 800,
@@ -523,8 +744,23 @@
       cursors = this.input.keyboard.createCursorKeys();
       this.input.keyboard.on('keydown-SPACE', shoot, this);
 
-      bullets = this.physics.add.group();
-      enemyBullets = this.physics.add.group();
+      // 使用 pooling 減少 create/destroy 造成的卡頓
+      bullets = this.physics.add.group({
+        maxSize: 12,
+        createCallback: function (bullet) {
+          bullet.setVelocityY(-450);
+          bullet.setSize(4, 10);
+          bullet.setDisplaySize(4, 10);
+        }
+      });
+      enemyBullets = this.physics.add.group({
+        maxSize: 20,
+        createCallback: function (eb) {
+          eb.setVelocityY(180);
+          eb.setSize(4, 8);
+          eb.setDisplaySize(4, 8);
+        }
+      });
       invaders = this.physics.add.group();
       explosions = this.add.group();
 
@@ -606,6 +842,7 @@
         bullet.setSize(4, 10);
         bullet.setDisplaySize(4, 10);
       }
+      SoundManager.play('shoot');
       lastShot = now;
     } catch(e) { console.warn('shoot err:',e); }
     }
@@ -620,10 +857,12 @@
       const exp = explosions.create(invader.x, invader.y);
       exp.setDisplaySize(42, 24);
       exp.play('explode');
+      SoundManager.play('explosion');
 
       if (invaders.countActive(true) === 0) {
         wave++;
         updateScoreText();
+        SoundManager.play('waveComplete');
         this.time.delayedCall(700, () => {
           createWave.call(this, wave);
         });
@@ -786,10 +1025,12 @@
       const exp = explosions.create(playerSprite.x, playerSprite.y);
       exp.setDisplaySize(48, 24);
       exp.play('explode');
+      SoundManager.play('playerHit');
 
       if (lives <= 0) {
         // 完全死亡 → Game Over
         gameOver = true;
+        SoundManager.play('gameOver');
         scoreText.setVisible(false);
         gameOverText.setVisible(true);
         restartText.setVisible(true);
@@ -822,6 +1063,8 @@
     }
 
     window.addEventListener('keydown', e => {
+      SoundManager.init();
+      SoundManager.resume();
       if (gameOver && e.key === ' ') {
         location.reload();
       }
