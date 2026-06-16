@@ -264,8 +264,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: default;
+      cursor: pointer;
       user-select: none;
+      touch-action: none;
       position: relative;
       transition: transform 0.03s;
       font-family: 'Press Start 2P', monospace;
@@ -331,6 +332,8 @@
         0 4px 6px rgba(0,0,0,0.5),
         inset 0 3px 6px rgba(0,0,0,0.6);
       position: relative;
+      cursor: pointer;
+      touch-action: none;
     }
     .joystick-stick {
       position: absolute;
@@ -341,6 +344,7 @@
       background: linear-gradient(90deg, #444, #222 50%, #333);
       border-radius: 5px 5px 3px 3px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      pointer-events: none; /* 讓指標事件落在 joystick-base 上 */
     }
     .joystick-stick::after {
       content: '';
