@@ -493,7 +493,7 @@ function update() {
   if (starfield) starfield.tilePositionY -= 0.4;
 
   try {
-  if (gameOver || !player || !player.body || !gameReady) return;
+  if (gameOver || !player || (!playerDead && !player.body) || !gameReady) return;
 
   // 死亡時不能操控
   if (playerDead) {
