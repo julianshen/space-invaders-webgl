@@ -251,6 +251,7 @@ let cursors;
 let bullets;
 let invaders;
 let explosions;
+let starfield;
 let score = 0;
 let wave = 1;
 let scoreText;
@@ -279,9 +280,6 @@ function preload() {
   const t = Date.now();
   this.load.image('spaceship', `spaceship.png?t=${t}`);
   this.load.image('invader', `invader1.png?t=${t}`);
-  this.load.image('explosion1', `explosion1.png?t=${t}`);
-  this.load.image('explosion2', `explosion2.png?t=${t}`);
-  this.load.image('explosion3', `explosion3.png?t=${t}`);
 }
 
 function create() {
@@ -298,6 +296,53 @@ function create() {
   ectx.fillStyle = '#ff4444';
   ectx.fillRect(0, 0, 4, 8);
   eBulletGfx.refresh();
+
+  // 用程式生成星空背景（800x600 tileSprite）
+  const starCanvas = this.textures.createCanvas('starfield', 800, 600);
+  const sctx = starCanvas.getContext();
+  for (let i = 0; i < 250; i++) {
+    const sx = Math.random() * 800;
+    const sy = Math.random() * 600;
+    const bright = Math.floor(Math.random() * 160 + 95);
+    const size = Math.random() > 0.92 ? 2 : 1;
+    sctx.fillStyle = `rgb(${bright},${bright},${bright})`;
+    sctx.fillRect(sx, sy, size, size);
+  }
+  starCanvas.refresh();
+
+  // 星空層放在最底下（在 player 和 invaders 之前加入）
+  starfield = this.add.tileSprite(0, 0, 800, 600, 'starfield').setOrigin(0, 0).setDepth(-1);
+
+  // 用程式生成爆炸 spritesheet（8 幀，更流暢）
+  const expFrames = 8;
+  const expSize = 64;
+  const expSheet = this.textures.createCanvas('explode_sheet', expSize * expFrames, expSize);
+  const exCtx = expSheet.getContext();
+  for (let f = 0; f < expFrames; f++) {
+    const cx = f * expSize + expSize / 2;
+    const cy = expSize / 2;
+    const p = f / (expFrames - 1); // 0～1
+    const r = 4 + p * 28;
+    const alpha = 1 - p * 0.85;
+    const red = 255;
+    const grn = Math.floor(255 * (1 - p * 0.8));
+    const blu = Math.floor(200 * (1 - p));
+    // 外圍光暈
+    exCtx.save();
+    exCtx.beginPath();
+    exCtx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+    exCtx.fillStyle = `rgba(${red},${Math.floor(grn * 0.4)},0,${alpha * 0.25})`;
+    exCtx.fill();
+    // 主體
+    exCtx.beginPath();
+    exCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    exCtx.fillStyle = `rgba(${red},${grn},${blu},${alpha})`;
+    exCtx.fill();
+    exCtx.restore();
+  }
+  expSheet.refresh();
+
+  // 爆炸動畫註冊移到 create() 統一管理
 
   // Player - 強制設定合理尺寸
   player = this.physics.add.sprite(400, 550, 'spaceship');
@@ -350,13 +395,9 @@ function create() {
   restartText.setVisible(false);
 
   this.anims.create({
-    key: 'explode',
-    frames: [
-      { key: 'explosion1' },
-      { key: 'explosion2' },
-      { key: 'explosion3' }
-    ],
-    frameRate: 12,
+    key: 'explode_pro',
+    frames: this.anims.generateFrameNumbers('explode_sheet', { start: 0, end: 7 }),
+    frameRate: 18,
     hideOnComplete: true
   });
 
@@ -417,9 +458,9 @@ function hitInvader(bullet, invader) {
   score += 100;
   updateScoreText();
 
-  const exp = explosions.create(invader.x, invader.y);
-  exp.setDisplaySize(42, 24);
-  exp.play('explode');
+  const exp = explosions.create(invader.x, invader.y, 'explode_sheet');
+  exp.setDisplaySize(56, 40);
+  exp.play('explode_pro');
   SoundManager.play('explosion');
 
   if (invaders.countActive(true) === 0) {
@@ -441,6 +482,9 @@ function updateScoreText() {
 }
 
 function update() {
+  // 星空持續滾動（即使 gameOver 也動）
+  if (starfield) starfield.tilePositionY -= 0.4;
+
   if (gameOver || !player || !gameReady) return;
   try {
 
@@ -569,7 +613,8 @@ function update() {
 
       const eb = enemyBullets.create(shooter.x, shooter.y + 12, 'ebullet');
       if (eb) {
-        eb.setVelocityY(180 + wave * 15);
+        const speed = 180 + wave * 15;
+        this.physics.moveToObject(eb, this.player, speed);
         eb.setSize(4, 8);
         eb.setDisplaySize(4, 8);
       }
@@ -592,9 +637,9 @@ function hitPlayer(enemyBullet, playerSprite) {
   drawLives.call(this);
 
   // 爆炸動畫
-  const exp = explosions.create(playerSprite.x, playerSprite.y);
-  exp.setDisplaySize(48, 24);
-  exp.play('explode');
+  const exp = explosions.create(playerSprite.x, playerSprite.y, 'explode_sheet');
+  exp.setDisplaySize(64, 48);
+  exp.play('explode_pro');
   SoundManager.play('playerHit');
 
   if (lives <= 0) {
@@ -643,10 +688,53 @@ function drawLives() {
   }
 }
 
+function restartGame() {
+  // Reset 所有遊戲狀態
+  gameOver = false;
+  gameReady = false;
+  score = 0;
+  wave = 1;
+  lives = 3;
+  playerDead = false;
+  invulnerable = false;
+  invulTimer = 0;
+  deadUntil = 0;
+  lastShot = 0;
+  lastEnemyShot = 0;
+  invaderSpeed = 80;
+
+  // 清除所有 group
+  invaders.clear(true, true);
+  bullets.clear(true, true);
+  enemyBullets.clear(true, true);
+  explosions.clear(true, true);
+  livesIcons.forEach(icon => icon.destroy());
+  livesIcons = [];
+
+  const scene = game.scene.scenes[0];
+
+  // 重建 player
+  if (player) player.destroy();
+  player = scene.physics.add.sprite(400, 550, 'spaceship');
+  player.setDisplaySize(48, 24);
+  player.setCollideWorldBounds(true);
+
+  // Reset UI
+  scoreText.setText(buildScoreText());
+  scoreText.setVisible(true);
+  gameOverText.setVisible(false);
+  restartText.setVisible(false);
+
+  // 重開 wave
+  createWave.call(scene, 1);
+  drawLives.call(scene);
+  gameReady = true;
+}
+
 window.addEventListener('keydown', e => {
   SoundManager.init();
   SoundManager.resume();
   if (gameOver && e.key === ' ') {
-    location.reload();
+    restartGame();
   }
 }, { capture: true });
