@@ -343,6 +343,11 @@ function create() {
   expSheet.refresh();
 
   // 爆炸動畫註冊移到 create() 統一管理
+  // 為 canvas spritesheet 註冊各 frame 的座標
+  const expTex = this.textures.get('explode_sheet');
+  for (let f = 0; f < expFrames; f++) {
+    expTex.add(f, 0, f * expSize, 0, expSize, expSize);
+  }
 
   // Player - 強制設定合理尺寸
   player = this.physics.add.sprite(400, 550, 'spaceship');
@@ -403,7 +408,7 @@ function create() {
 
   createWave.call(this, 1);
   this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
-  this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
+  this._playerHitCollider = this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
 
   // 生命數圖示（右上角顯示小戰機）
   drawLives.call(this);
@@ -490,25 +495,20 @@ function update() {
 
   // 死亡時不能操控
   if (playerDead) {
-    try { player.setVelocityX(0); } catch(e) {
-      // player 掛了 → 強制重生並重建 sprite
-      playerDead = false;
-      invulnerable = true;
-      invulTimer = 0;
-      deadUntil = Date.now() + 100;
-      // 重建 player sprite（原來的壞了）
-      if (typeof create === 'function') {
-        try {
-          player = this.physics.add.sprite(400, 550, 'spaceship');
-          player.setDisplaySize(48, 24);
-          player.setCollideWorldBounds(true);
-          this.physics.world.enable(player);
-        } catch(e2) {}
-      }
-      console.warn('dead-recovery');
+    if (player && player.body) {
+      player.setVelocityX(0);
     }
-    // 計時重生（不 return，讓 bounce/射擊邏輯繼續跑）
-    if (player && Date.now() >= deadUntil) {
+    // 計時重生
+    if (Date.now() >= deadUntil) {
+      if (!player || !player.body) {
+        // 重建 player sprite（如果壞了）
+        player = this.physics.add.sprite(400, 550, 'spaceship');
+        player.setDisplaySize(48, 24);
+        player.setCollideWorldBounds(true);
+        // 重新註冊 overlap（player 被重建了）
+        this.physics.world.removeCollider(this._playerHitCollider);
+        this._playerHitCollider = this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
+      }
       player.setPosition(400, 550);
       player.setVisible(true);
       player.body.enable = true;
@@ -516,7 +516,8 @@ function update() {
       invulnerable = true;
       invulTimer = 0;
     }
-    // 跳到 bounce/射擊邏輯（不提前 return）
+    // 還在死亡期間，不做 bounce/移動
+    return;
   }
 
   if (!playerDead) {
@@ -713,11 +714,15 @@ function restartGame() {
 
   const scene = game.scene.scenes[0];
 
-  // 重建 player
+  // 清除舊的 overlap 並重建 player
+  if (scene._playerHitCollider) {
+    scene.physics.world.removeCollider(scene._playerHitCollider);
+  }
   if (player) player.destroy();
   player = scene.physics.add.sprite(400, 550, 'spaceship');
   player.setDisplaySize(48, 24);
   player.setCollideWorldBounds(true);
+  scene._playerHitCollider = scene.physics.add.overlap(enemyBullets, player, hitPlayer, null, scene);
 
   // Reset UI
   scoreText.setText(buildScoreText());
