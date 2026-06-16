@@ -658,9 +658,14 @@
     play(name) {
       this.init();
       this.resume();
-      // 若 context 剛 resume 還 suspended，排程播放靠 keydown 預熱 cover
       if (this.ctx && this.sounds[name]) {
-        this.sounds[name]();
+        // 若 context 剛 resume 還 suspended，等 resume 完成再播
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+          setTimeout(() => this.sounds[name](), 50);
+        } else {
+          this.sounds[name]();
+        }
       }
     }
   };
@@ -1068,7 +1073,7 @@
       if (gameOver && e.key === ' ') {
         location.reload();
       }
-    });
+    }, { capture: true });
   </script>
 </body>
 </html>
