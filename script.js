@@ -473,6 +473,8 @@ function hitInvader(bullet, invader) {
     updateScoreText();
     SoundManager.play('waveComplete');
     this.time.delayedCall(700, () => {
+      // 守衛：若期間發生 game over 或 restart，就不要再生成新波
+      if (gameOver || !gameReady) return;
       createWave.call(this, wave);
     });
   }
@@ -498,8 +500,8 @@ function update() {
     if (player && player.body) {
       player.setVelocityX(0);
     }
-    // 計時重生
-    if (Date.now() >= deadUntil) {
+    // 計時重生（用 scene 時鐘：分頁切到背景時 Phaser 會暫停，計時不會錯亂）
+    if (this.time.now >= deadUntil) {
       if (!player || !player.body) {
         // 重建 player sprite（如果壞了）
         player = this.physics.add.sprite(400, 550, 'spaceship');
@@ -543,46 +545,45 @@ function update() {
   // === 敵人邊界反彈（只在 playing 時做） ===
   if (gameOver) return;
 
+  // 先用「快照」純讀取掃描，不在迭代中修改 group（createWave 會 clear/recreate
+  // 同一個 group，若在 forEach 進行中呼叫會破壞陣列、導致狀態錯亂）。
   let bounce = false;
   let side = 'none';
-  invaders.getChildren().forEach(inv => {
-    if (inv.active && inv.x < 40) {
-      bounce = true;
-      side = 'left';
+  let reachedBottom = false;
+  const invaderSnapshot = invaders.getChildren().slice();
+  for (const inv of invaderSnapshot) {
+    if (!inv || !inv.active) continue;
+    if (inv.x < 40) { bounce = true; side = 'left'; }
+    if (inv.x > 760) { bounce = true; side = 'right'; }
+    if (inv.y > 530) { reachedBottom = true; break; }
+  }
+
+  // 敵人到底 → 扣一條命。所有會修改 group 的動作都在迭代之外執行。
+  if (reachedBottom && !gameOver && !playerDead) {
+    lives--;
+    drawLives.call(this);
+    if (lives <= 0) {
+      gameOver = true;
+      // === SAVE HIGH SCORE ===
+      saveHighScore();
+      scoreText.setVisible(false);
+      gameOverText.setText(`GAME OVER\n\nHIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
+      gameOverText.setVisible(true);
+      restartText.setVisible(true);
+    } else {
+      // 重生並重置關卡（用 scene 時鐘計時，背景分頁時會一起暫停）
+      playerDead = true;
+      deadUntil = this.time.now + 1200;
+      if (player) { player.setVisible(false); if (player.body) player.body.enable = false; }
+      enemyBullets.getChildren().slice().forEach(b => b.destroy());
+      createWave.call(this, wave);
     }
-    if (inv.active && inv.x > 760) {
-      bounce = true;
-      side = 'right';
-    }
-    if (inv.active && inv.y > 530) {
-      // 敵人到底 → 扣一條命，重置敵人到頂端
-      if (!gameOver && !playerDead) {
-        lives--;
-        drawLives.call(this);
-        if (lives <= 0) {
-          gameOver = true;
-          // === SAVE HIGH SCORE ===
-          saveHighScore();
-          scoreText.setVisible(false);
-          gameOverText.setText(`GAME OVER\n\nHIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
-          gameOverText.setVisible(true);
-          restartText.setVisible(true);
-        } else {
-          // 重生並重置關卡
-          playerDead = true;
-          deadUntil = Date.now() + 1200;
-          if (player) { player.setVisible(false); if (player.body) player.body.enable = false; }
-          enemyBullets.getChildren().forEach(b => b.destroy());
-          createWave.call(this, wave);
-        }
-      }
-      return; // 跳出迴圈，只處理一次
-    }
-  });
+    return; // 本幀處理完畢，避免對剛重建的 group 再做反彈處理
+  }
 
   if (bounce) {
-    invaders.getChildren().forEach(inv => {
-      if (inv.active) {
+    invaders.getChildren().slice().forEach(inv => {
+      if (inv && inv.active && inv.body) {
         // 反彈後速度稍微加快（越打越快，但幅度小一點）
         const currentSpeed = Math.abs(inv.body.velocity.x);
         const newSpeed = Math.min(currentSpeed + 2, 220);
@@ -596,9 +597,9 @@ function update() {
     });
   }
 
-  // Player子彈超出畫面清除
-  bullets.getChildren().forEach(b => {
-    if (b.y < 0) b.destroy();
+  // Player子彈超出畫面清除（用快照，避免邊迭代邊 destroy 破壞 group 陣列）
+  bullets.getChildren().slice().forEach(b => {
+    if (b && b.y < 0) b.destroy();
   });
 
   // 敵人射擊
@@ -617,7 +618,13 @@ function update() {
       const eb = enemyBullets.create(shooter.x, shooter.y + 12, 'ebullet');
       if (eb) {
         const speed = 180 + wave * 15;
-        this.physics.moveToObject(eb, player, speed);
+        // player 可能在死亡/重建期間為 null 或 body 失效 → 此時直線下墜，
+        // 不要把 null 傳進 moveToObject（會丟例外、被 update 的 catch 吞掉）。
+        if (player && player.body && player.active) {
+          this.physics.moveToObject(eb, player, speed);
+        } else {
+          eb.setVelocityY(speed);
+        }
         eb.setSize(4, 8);
         eb.setDisplaySize(4, 8);
       }
@@ -625,11 +632,11 @@ function update() {
     }
   }
 
-  // 敵人子彈超出畫面清除
-  enemyBullets.getChildren().forEach(b => {
-    if (b.y > 600) b.destroy();
+  // 敵人子彈超出畫面清除（用快照，避免邊迭代邊 destroy 破壞 group 陣列）
+  enemyBullets.getChildren().slice().forEach(b => {
+    if (b && b.y > 600) b.destroy();
   });
-} catch(e) {}  // silent catch — errors already handled locally
+} catch(e) { console.warn('update err:', e); }  // 讓 update 內的錯誤可見，方便除錯
 }
 
 function hitPlayer(enemyBullet, playerSprite) {
@@ -660,9 +667,9 @@ function hitPlayer(enemyBullet, playerSprite) {
     livesIcons.forEach(icon => icon.destroy());
     livesIcons = [];
   } else {
-    // 還有命 → 重生（用 Date.now() 計時）
+    // 還有命 → 重生（用 scene 時鐘計時，背景分頁時會一起暫停）
     playerDead = true;
-    deadUntil = Date.now() + 1200;
+    deadUntil = this.time.now + 1200;
     playerSprite.setVisible(false);
     playerSprite.body.enable = false;
     // 剩下的敵人子彈自然飛出畫面 cleanup，不在物理回呼內 destroy
@@ -715,6 +722,10 @@ function restartGame() {
   livesIcons = [];
 
   const scene = game.scene.scenes[0];
+
+  // 清除所有待觸發的計時器（例如 hitInvader 排程的 createWave delayedCall），
+  // 否則重開後它們仍會 fire，把舊狀態套到新局上。
+  scene.time.removeAllEvents();
 
   // 清除舊的 overlap 並重建 player
   if (scene._playerHitCollider) {
