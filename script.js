@@ -257,7 +257,8 @@ let wave = 1;
 let scoreText;
 let gameOver = false;
 let lastShot = 0;
-let invaderSpeed = 80;
+// 每波的基礎速度（只讀）；實際難度由 createWave 依 waveNum 遞增。
+const INVADER_BASE_SPEED = 80;
 let enemyBullets;
 let lastEnemyShot = 0;
 let gameOverText;
@@ -274,13 +275,16 @@ let invulTimer = 0;
 let deadUntil = 0;
 let gameReady = false;
 
+// === 觸控 / 螢幕控制狀態（由 setupTouchControls 維護） ===
+const touchState = { left: false, right: false, fire: false };
+
 // === HIGH SCORE (localStorage) ===
 let highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0', 10);
 
 function preload() {
-  const t = Date.now();
-  this.load.image('spaceship', `spaceship.png?t=${t}`);
-  this.load.image('invader', `invader1.png?t=${t}`);
+  // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
+  this.load.image('spaceship', 'spaceship.png');
+  this.load.image('invader', 'invader1.png');
 }
 
 function create() {
@@ -356,25 +360,11 @@ function create() {
   player.setCollideWorldBounds(true);
 
   cursors = this.input.keyboard.createCursorKeys();
-  this.input.keyboard.on('keydown-SPACE', shoot, this);
+  // 射擊改用 update 內輪詢（cursors.space / 觸控火力鍵），按住即可連發（仍受冷卻限制）。
 
-  // 使用 pooling 減少 create/destroy 造成的卡頓
-  bullets = this.physics.add.group({
-    maxSize: 12,
-    createCallback: function (bullet) {
-      bullet.setVelocityY(-450);
-      bullet.setSize(4, 10);
-      bullet.setDisplaySize(4, 10);
-    }
-  });
-  enemyBullets = this.physics.add.group({
-    maxSize: 20,
-    createCallback: function (eb) {
-      eb.setVelocityY(180);
-      eb.setSize(4, 8);
-      eb.setDisplaySize(4, 8);
-    }
-  });
+  // 真正的物件池：用 get()/disableBody() 回收，不再每次 create/destroy。
+  bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 12 });
+  enemyBullets = this.physics.add.group({ defaultKey: 'ebullet', maxSize: 20 });
   invaders = this.physics.add.group();
   explosions = this.add.group();
 
@@ -443,7 +433,7 @@ function createWave(waveNum) {
       inv.setDisplaySize(42, 24);
       // 隨機初始方向，讓敵人不會全部同方向移動
       const dir = (Math.random() > 0.5) ? 1 : -1;
-      inv.setVelocityX((invaderSpeed + (waveNum - 1) * 18) * dir);
+      inv.setVelocityX((INVADER_BASE_SPEED + (waveNum - 1) * 18) * dir);
       // 記錄每隻敵人的原始 row，用來做階梯式掉落
       inv.setData('row', row);
     }
@@ -457,19 +447,20 @@ function shoot() {
   const now = this.time.now;
   if (now - lastShot < 180) return;
 
-  const bullet = bullets.create(player.x, player.y - 10, 'bullet');
-  if (bullet) {
-    bullet.setVelocityY(-450);
-    bullet.setSize(4, 10);
-    bullet.setDisplaySize(4, 10);
-  }
+  // 從池中取得（沒有閒置子彈且已達上限時回傳 null）。
+  const bullet = bullets.get(player.x, player.y - 10, 'bullet');
+  if (!bullet) return;
+  bullet.enableBody(true, player.x, player.y - 10, true, true);
+  bullet.setSize(4, 10);
+  bullet.setDisplaySize(4, 10);
+  bullet.setVelocityY(-450);
   SoundManager.play('shoot');
   lastShot = now;
 } catch(e) { console.warn('shoot err:',e); }
 }
 
 function hitInvader(bullet, invader) {
-  bullet.destroy();
+  bullet.disableBody(true, true); // 回收子彈到池中
   invader.destroy();
 
   score += 100;
@@ -547,12 +538,18 @@ function update() {
       }
     }
 
-    if (cursors.left.isDown) {
-      if (player) player.setVelocityX(-220);
-    } else if (cursors.right.isDown) {
-      if (player) player.setVelocityX(220);
-    } else {
-      if (player) player.setVelocityX(0);
+    // 鍵盤方向鍵或螢幕搖桿皆可控制
+    const moveLeft = cursors.left.isDown || touchState.left;
+    const moveRight = cursors.right.isDown || touchState.right;
+    if (player) {
+      if (moveLeft) player.setVelocityX(-220);
+      else if (moveRight) player.setVelocityX(220);
+      else player.setVelocityX(0);
+    }
+
+    // 按住空白鍵或螢幕火力鍵連發（shoot 內含 180ms 冷卻）
+    if ((cursors.space && cursors.space.isDown) || touchState.fire) {
+      shoot.call(this);
     }
   }
 
@@ -582,6 +579,7 @@ function update() {
       gameOver = true;
       // === SAVE HIGH SCORE ===
       saveHighScore();
+      freezeField(); // 停下所有敵人 / 子彈，避免在 GAME OVER 畫面繼續飄移
       scoreText.setVisible(false);
       gameOverText.setText('GAME OVER');
       finalScoreText.setText(`HIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
@@ -593,7 +591,7 @@ function update() {
       playerDead = true;
       deadUntil = this.time.now + 1200;
       if (player) { player.setVisible(false); if (player.body) player.body.enable = false; }
-      enemyBullets.getChildren().slice().forEach(b => b.destroy());
+      // createWave 會清空 enemyBullets，這裡不需另外回收
       createWave.call(this, wave);
     }
     return; // 本幀處理完畢，避免對剛重建的 group 再做反彈處理
@@ -615,9 +613,9 @@ function update() {
     });
   }
 
-  // Player子彈超出畫面清除（用快照，避免邊迭代邊 destroy 破壞 group 陣列）
+  // Player子彈超出畫面回收到池中（用快照，避免邊迭代邊修改 group 陣列）
   bullets.getChildren().slice().forEach(b => {
-    if (b && b.y < 0) b.destroy();
+    if (b && b.active && b.y < 0) b.disableBody(true, true);
   });
 
   // 敵人射擊
@@ -633,8 +631,11 @@ function update() {
       const shooters = activeInvaders.slice(0, Math.min(3, activeInvaders.length));
       const shooter = Phaser.Math.RND.pick(shooters);
 
-      const eb = enemyBullets.create(shooter.x, shooter.y + 12, 'ebullet');
+      const eb = enemyBullets.get(shooter.x, shooter.y + 12, 'ebullet');
       if (eb) {
+        eb.enableBody(true, shooter.x, shooter.y + 12, true, true);
+        eb.setSize(4, 8);
+        eb.setDisplaySize(4, 8);
         const speed = 180 + wave * 15;
         // player 可能在死亡/重建期間為 null 或 body 失效 → 此時直線下墜，
         // 不要把 null 傳進 moveToObject（會丟例外、被 update 的 catch 吞掉）。
@@ -643,16 +644,14 @@ function update() {
         } else {
           eb.setVelocityY(speed);
         }
-        eb.setSize(4, 8);
-        eb.setDisplaySize(4, 8);
       }
       lastEnemyShot = now;
     }
   }
 
-  // 敵人子彈超出畫面清除（用快照，避免邊迭代邊 destroy 破壞 group 陣列）
+  // 敵人子彈超出畫面回收到池中（用快照，避免邊迭代邊修改 group 陣列）
   enemyBullets.getChildren().slice().forEach(b => {
-    if (b && b.y > 600) b.destroy();
+    if (b && b.active && b.y > 600) b.disableBody(true, true);
   });
 } catch(e) { console.warn('update err:', e); }  // 讓 update 內的錯誤可見，方便除錯
 }
@@ -660,7 +659,7 @@ function update() {
 function hitPlayer(enemyBullet, playerSprite) {
   try {
   if (invulnerable || gameOver || playerDead) return;
-  enemyBullet.destroy();
+  enemyBullet.disableBody(true, true); // 回收敵人子彈到池中
   lives--;
   drawLives.call(this);
 
@@ -677,6 +676,7 @@ function hitPlayer(enemyBullet, playerSprite) {
     SoundManager.play('gameOver');
     // === SAVE HIGH SCORE ===
     saveHighScore();
+    freezeField(); // 停下所有敵人 / 子彈，避免在 GAME OVER 畫面繼續飄移
     scoreText.setVisible(false);
     gameOverText.setText('GAME OVER');
     finalScoreText.setText(`HIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
@@ -696,6 +696,16 @@ function hitPlayer(enemyBullet, playerSprite) {
     // 剩下的敵人子彈自然飛出畫面 cleanup，不在物理回呼內 destroy
   }
 } catch(e) { console.warn('hitPlayer err:',e); }
+}
+
+// 停下場上所有敵人與子彈（GAME OVER 時呼叫，避免畫面繼續飄移）
+function freezeField() {
+  [invaders, enemyBullets, bullets].forEach(grp => {
+    if (!grp) return;
+    grp.getChildren().forEach(o => {
+      if (o && o.body) o.setVelocity(0, 0);
+    });
+  });
 }
 
 // === HIGH SCORE: save to localStorage if current score is higher ===
@@ -732,7 +742,6 @@ function restartGame() {
   deadUntil = 0;
   lastShot = 0;
   lastEnemyShot = 0;
-  invaderSpeed = 80;
 
   // 清除所有 group
   invaders.clear(true, true);
@@ -778,3 +787,78 @@ window.addEventListener('keydown', e => {
     restartGame();
   }
 }, { capture: true });
+
+// ====================
+// 螢幕 / 觸控控制：把機台上的搖桿與 FIRE 鈕接上遊戲
+// ====================
+function setupTouchControls() {
+  const fireBtn = document.querySelector('.arcade-btn.fire');
+  const coinBtn = document.querySelector('.arcade-btn.coin');
+  const joyBase = document.querySelector('.joystick-base');
+  const joyStick = document.querySelector('.joystick-stick');
+
+  const unlockAudio = () => { SoundManager.init(); SoundManager.resume(); };
+
+  if (fireBtn) {
+    const press = e => {
+      e.preventDefault();
+      unlockAudio();
+      if (gameOver) restartGame(); // GAME OVER 時 FIRE 也能重開
+      else touchState.fire = true;
+    };
+    const release = e => { e.preventDefault(); touchState.fire = false; };
+    fireBtn.addEventListener('pointerdown', press);
+    fireBtn.addEventListener('pointerup', release);
+    fireBtn.addEventListener('pointerleave', release);
+    fireBtn.addEventListener('pointercancel', release);
+  }
+
+  if (coinBtn) {
+    coinBtn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      unlockAudio();
+      if (gameOver) restartGame();
+    });
+  }
+
+  if (joyBase) {
+    let activeId = null;
+    const setDir = clientX => {
+      const rect = joyBase.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const dx = clientX - cx;
+      const dead = rect.width * 0.18; // 中央死區
+      touchState.left = dx < -dead;
+      touchState.right = dx > dead;
+      if (joyStick) {
+        const off = Math.max(-12, Math.min(12, dx));
+        joyStick.style.transform = `translate(calc(-50% + ${off}px), -65%)`;
+      }
+    };
+    const start = e => {
+      activeId = e.pointerId;
+      unlockAudio();
+      if (joyBase.setPointerCapture) { try { joyBase.setPointerCapture(e.pointerId); } catch (_) {} }
+      setDir(e.clientX);
+      e.preventDefault();
+    };
+    const move = e => { if (activeId === e.pointerId) setDir(e.clientX); };
+    const end = e => {
+      if (activeId !== e.pointerId) return;
+      activeId = null;
+      touchState.left = false;
+      touchState.right = false;
+      if (joyStick) joyStick.style.transform = 'translate(-50%, -65%)';
+    };
+    joyBase.addEventListener('pointerdown', start);
+    joyBase.addEventListener('pointermove', move);
+    joyBase.addEventListener('pointerup', end);
+    joyBase.addEventListener('pointercancel', end);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupTouchControls);
+} else {
+  setupTouchControls();
+}

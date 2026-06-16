@@ -264,8 +264,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: default;
+      cursor: pointer;
       user-select: none;
+      touch-action: none;
       position: relative;
       transition: transform 0.03s;
       font-family: 'Press Start 2P', monospace;
@@ -331,7 +332,10 @@
         0 4px 6px rgba(0,0,0,0.5),
         inset 0 3px 6px rgba(0,0,0,0.6);
       position: relative;
+      cursor: pointer;
+      touch-action: none;
     }
+    .joystick-stick { pointer-events: none; }
     .joystick-stick {
       position: absolute;
       top: 50%; left: 50%;
