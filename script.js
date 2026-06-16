@@ -762,7 +762,7 @@ function restartGame() {
   scoreText.setText(buildScoreText());
   scoreText.setVisible(true);
   gameOverText.setVisible(false);
-  finalScoreText.setVisible(false);
+  finalScoreText.setText('').setVisible(false);
   restartText.setVisible(false);
 
   // 重開 wave
