@@ -261,6 +261,7 @@ let invaderSpeed = 80;
 let enemyBullets;
 let lastEnemyShot = 0;
 let gameOverText;
+let finalScoreText;
 let restartText;
 let goOverlayRef;
 
@@ -377,26 +378,37 @@ function create() {
   invaders = this.physics.add.group();
   explosions = this.add.group();
 
+  // UI 文字統一給高 depth，否則之後在 createWave 建立的 invaders（同 depth 0、
+  // 但較晚加入 display list）會蓋在分數 / GAME OVER 文字上面。
   scoreText = this.add.text(16, 16, buildScoreText(), {
     fontFamily: 'monospace',
     fontSize: '22px',
     color: '#00ff00'
-  });
+  }).setDepth(100);
 
   // Game Over 畫面 (戲劇版)
-  gameOverText = this.add.text(400, 240, 'GAME OVER', {
+  gameOverText = this.add.text(400, 220, 'GAME OVER', {
     fontFamily: 'monospace',
     fontSize: '80px',
     color: '#ff0000',
     fontStyle: 'bold'
-  }).setOrigin(0.5);
+  }).setOrigin(0.5).setDepth(100);
   gameOverText.setVisible(false);
 
-  restartText = this.add.text(400, 340, 'PRESS SPACE TO RESTART', {
+  // 高分另開一個文字物件。原本塞進 80px 的 gameOverText 裡，
+  // "HIGH SCORE: 00000" 在等寬字下約 816px，會超出 800px 畫布被裁切。
+  finalScoreText = this.add.text(400, 320, '', {
+    fontFamily: 'monospace',
+    fontSize: '30px',
+    color: '#ffdd00'
+  }).setOrigin(0.5).setDepth(100);
+  finalScoreText.setVisible(false);
+
+  restartText = this.add.text(400, 400, 'PRESS SPACE TO RESTART', {
     fontFamily: 'monospace',
     fontSize: '28px',
     color: '#ffff00'
-  }).setOrigin(0.5);
+  }).setOrigin(0.5).setDepth(100);
   restartText.setVisible(false);
 
   this.anims.create({
@@ -463,7 +475,7 @@ function hitInvader(bullet, invader) {
   score += 100;
   updateScoreText();
 
-  const exp = explosions.create(invader.x, invader.y, 'explode_sheet');
+  const exp = explosions.create(invader.x, invader.y, 'explode_sheet', 0);
   exp.setDisplaySize(56, 40);
   exp.play('explode_pro');
   // 動畫播完即銷毀，避免隱藏的爆炸 sprite 無限累積（hideOnComplete 只隱藏不釋放）。
@@ -571,8 +583,10 @@ function update() {
       // === SAVE HIGH SCORE ===
       saveHighScore();
       scoreText.setVisible(false);
-      gameOverText.setText(`GAME OVER\n\nHIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
+      gameOverText.setText('GAME OVER');
+      finalScoreText.setText(`HIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
       gameOverText.setVisible(true);
+      finalScoreText.setVisible(true);
       restartText.setVisible(true);
     } else {
       // 重生並重置關卡（用 scene 時鐘計時，背景分頁時會一起暫停）
@@ -651,7 +665,7 @@ function hitPlayer(enemyBullet, playerSprite) {
   drawLives.call(this);
 
   // 爆炸動畫
-  const exp = explosions.create(playerSprite.x, playerSprite.y, 'explode_sheet');
+  const exp = explosions.create(playerSprite.x, playerSprite.y, 'explode_sheet', 0);
   exp.setDisplaySize(64, 48);
   exp.play('explode_pro');
   exp.once('animationcomplete', () => exp.destroy());
@@ -664,8 +678,10 @@ function hitPlayer(enemyBullet, playerSprite) {
     // === SAVE HIGH SCORE ===
     saveHighScore();
     scoreText.setVisible(false);
-    gameOverText.setText(`GAME OVER\n\nHIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
+    gameOverText.setText('GAME OVER');
+    finalScoreText.setText(`HIGH SCORE: ${highScore.toString().padStart(5, '0')}`);
     gameOverText.setVisible(true);
+    finalScoreText.setVisible(true);
     restartText.setVisible(true);
     playerSprite.setVisible(false);
     // 清掉生命圖示
@@ -746,6 +762,7 @@ function restartGame() {
   scoreText.setText(buildScoreText());
   scoreText.setVisible(true);
   gameOverText.setVisible(false);
+  finalScoreText.setVisible(false);
   restartText.setVisible(false);
 
   // 重開 wave
