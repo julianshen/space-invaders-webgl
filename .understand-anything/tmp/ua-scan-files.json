@@ -1,0 +1,23 @@
+{
+  "scriptCompleted": true,
+  "files": [
+    {
+      "path": "index.html",
+      "language": "html",
+      "sizeLines": 1078,
+      "fileCategory": "markup"
+    }
+  ],
+  "totalFiles": 1,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "stats": {
+    "filesScanned": 1,
+    "byCategory": {
+      "markup": 1
+    },
+    "byLanguage": {
+      "html": 1
+    }
+  }
+}

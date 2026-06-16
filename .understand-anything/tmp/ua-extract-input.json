@@ -1,0 +1,12 @@
+{
+  "projectRoot": "/Users/julianshen/space-invaders-webgl",
+  "batchFiles": [
+    {
+      "path": "index.html",
+      "language": "html",
+      "sizeLines": 1078,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {}
+}

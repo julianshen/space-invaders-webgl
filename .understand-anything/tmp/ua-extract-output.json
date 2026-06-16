@@ -1,0 +1,15 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 1,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "index.html",
+      "language": "html",
+      "fileCategory": "markup",
+      "totalLines": 1079,
+      "nonEmptyLines": 984,
+      "metrics": {}
+    }
+  ]
+}
