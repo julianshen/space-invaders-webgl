@@ -460,6 +460,9 @@ function shoot() {
 }
 
 function hitInvader(bullet, invader) {
+  // game over 後 overlap 仍可能被觸發（尤其子彈被 freezeField 凍在敵人身上時會每幀重複），
+  // 守衛避免結束後還能計分 / 觸發爆炸 / 進下一波。
+  if (gameOver) return;
   bullet.disableBody(true, true); // 回收子彈到池中
   invader.destroy();
 
@@ -703,9 +706,11 @@ function freezeField() {
   [invaders, enemyBullets, bullets].forEach(grp => {
     if (!grp) return;
     grp.getChildren().forEach(o => {
-      if (o && o.body) o.setVelocity(0, 0);
+      if (o && o.active && o.body) o.setVelocity(0, 0);
     });
   });
+  // 玩家船在「敵人到底」結束時仍可見，若還有殘留速度會繼續滑出畫面
+  if (player && player.body) player.setVelocity(0, 0);
 }
 
 // === HIGH SCORE: save to localStorage if current score is higher ===
@@ -854,6 +859,9 @@ function setupTouchControls() {
     joyBase.addEventListener('pointermove', move);
     joyBase.addEventListener('pointerup', end);
     joyBase.addEventListener('pointercancel', end);
+    // 指標捕捉中途遺失（多點觸控 / 系統對話框 / 拖出畫面）時 pointerup 可能不觸發，
+    // 補這個事件避免搖桿卡在某個方向。
+    joyBase.addEventListener('lostpointercapture', end);
   }
 }
 
