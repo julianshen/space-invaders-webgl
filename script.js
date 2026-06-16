@@ -420,7 +420,11 @@ function create() {
 function createWave(waveNum) {
   try {
   invaders.clear(true, true);
-  enemyBullets.clear(true, true);
+  // createWave 負責清掉上一波殘留的敵人子彈。用 disableBody 回收（而非 clear 銷毀），
+  // 保留物件池成員，避免每波在邊界重新配置 sprite。
+  enemyBullets.getChildren().forEach(b => {
+    if (b && b.body) b.disableBody(true, true);
+  });
 
   const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
   const cols = 8;

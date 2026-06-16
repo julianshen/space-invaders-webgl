@@ -335,7 +335,6 @@
       cursor: pointer;
       touch-action: none;
     }
-    .joystick-stick { pointer-events: none; }
     .joystick-stick {
       position: absolute;
       top: 50%; left: 50%;
@@ -345,6 +344,7 @@
       background: linear-gradient(90deg, #444, #222 50%, #333);
       border-radius: 5px 5px 3px 3px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      pointer-events: none; /* 讓指標事件落在 joystick-base 上 */
     }
     .joystick-stick::after {
       content: '';
