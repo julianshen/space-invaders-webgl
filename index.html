@@ -566,9 +566,9 @@
         const ctx = SoundManager.ctx;
         if (!ctx) return;
         // 低頻 thud
-        SoundManager._playOsc('sine', 150, 0.15, { type: 'lowpass', freq: 400, Q: 1 }, 0.2);
+        SoundManager._playOsc('sine', 150, 0.2, { type: 'lowpass', freq: 400, Q: 1 }, 0.3);
         // 噪音 burst
-        SoundManager._playNoise(0.12, { type: 'lowpass', freq: 800, Q: 1 }, 0.12);
+        SoundManager._playNoise(0.15, { type: 'lowpass', freq: 800, Q: 1 }, 0.2);
       },
 
       // === 玩家受傷 — 較沉的下降音 ===
@@ -586,7 +586,7 @@
         filter.Q.value = 1.5;
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
 
         osc.connect(filter);
@@ -596,7 +596,7 @@
         osc.stop(ctx.currentTime + 0.45);
 
         // 加噪音
-        SoundManager._playNoise(0.3, { type: 'lowpass', freq: 300, Q: 1 }, 0.1);
+        SoundManager._playNoise(0.3, { type: 'lowpass', freq: 300, Q: 1 }, 0.15);
       },
 
       // === Game Over — 緩慢下降 ===
@@ -615,8 +615,8 @@
         filter.Q.value = 2;
 
         const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.8);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.8);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
 
         osc.connect(filter);
@@ -638,7 +638,7 @@
           const gain = ctx.createGain();
           const t = ctx.currentTime + i * 0.12;
           gain.gain.setValueAtTime(0, t);
-          gain.gain.linearRampToValueAtTime(0.2, t + 0.04);
+          gain.gain.linearRampToValueAtTime(0.28, t + 0.04);
           gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
 
           const filter = ctx.createBiquadFilter();
