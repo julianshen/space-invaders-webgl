@@ -466,6 +466,8 @@ function hitInvader(bullet, invader) {
   const exp = explosions.create(invader.x, invader.y, 'explode_sheet');
   exp.setDisplaySize(56, 40);
   exp.play('explode_pro');
+  // 動畫播完即銷毀，避免隱藏的爆炸 sprite 無限累積（hideOnComplete 只隱藏不釋放）。
+  exp.once('animationcomplete', () => exp.destroy());
   SoundManager.play('explosion');
 
   if (invaders.countActive(true) === 0) {
@@ -552,9 +554,11 @@ function update() {
   let reachedBottom = false;
   const invaderSnapshot = invaders.getChildren().slice();
   for (const inv of invaderSnapshot) {
-    if (!inv || !inv.active) continue;
-    if (inv.x < 40) { bounce = true; side = 'left'; }
-    if (inv.x > 760) { bounce = true; side = 'right'; }
+    if (!inv || !inv.active || !inv.body) continue;
+    // 只有「正朝牆壁移動」時才反彈，否則卡在邊界的敵人會每幀重複反彈，
+    // 造成連續多次掉落 + 速度暴衝。
+    if (inv.x < 40 && inv.body.velocity.x < 0) { bounce = true; side = 'left'; }
+    if (inv.x > 760 && inv.body.velocity.x > 0) { bounce = true; side = 'right'; }
     if (inv.y > 530) { reachedBottom = true; break; }
   }
 
@@ -650,6 +654,7 @@ function hitPlayer(enemyBullet, playerSprite) {
   const exp = explosions.create(playerSprite.x, playerSprite.y, 'explode_sheet');
   exp.setDisplaySize(64, 48);
   exp.play('explode_pro');
+  exp.once('animationcomplete', () => exp.destroy());
   SoundManager.play('playerHit');
 
   if (lives <= 0) {
