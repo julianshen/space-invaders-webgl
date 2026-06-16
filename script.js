@@ -490,8 +490,8 @@ function update() {
   // 星空持續滾動（即使 gameOver 也動）
   if (starfield) starfield.tilePositionY -= 0.4;
 
-  if (gameOver || !player || !gameReady) return;
   try {
+  if (gameOver || !player || !player.body || !gameReady) return;
 
   // 死亡時不能操控
   if (playerDead) {
@@ -527,7 +527,7 @@ function update() {
       player.setAlpha(Math.sin(invulTimer * 0.015) > 0 ? 1 : 0.2);
       if (invulTimer > 2500) {
         invulnerable = false;
-        player.setAlpha(1);
+        if (player) player.setAlpha(1);
       }
     }
 
@@ -539,6 +539,9 @@ function update() {
       if (player) player.setVelocityX(0);
     }
   }
+
+  // === 敵人邊界反彈（只在 playing 時做） ===
+  if (gameOver) return;
 
   let bounce = false;
   let side = 'none';
@@ -568,8 +571,7 @@ function update() {
           // 重生並重置關卡
           playerDead = true;
           deadUntil = Date.now() + 1200;
-          player.setVisible(false);
-          player.body.enable = false;
+          if (player) { player.setVisible(false); if (player.body) player.body.enable = false; }
           enemyBullets.getChildren().forEach(b => b.destroy());
           createWave.call(this, wave);
         }
@@ -615,7 +617,7 @@ function update() {
       const eb = enemyBullets.create(shooter.x, shooter.y + 12, 'ebullet');
       if (eb) {
         const speed = 180 + wave * 15;
-        this.physics.moveToObject(eb, this.player, speed);
+        this.physics.moveToObject(eb, player, speed);
         eb.setSize(4, 8);
         eb.setDisplaySize(4, 8);
       }
@@ -627,7 +629,7 @@ function update() {
   enemyBullets.getChildren().forEach(b => {
     if (b.y > 600) b.destroy();
   });
-} catch(e) { console.warn('update err:',e); }
+} catch(e) {}  // silent catch — errors already handled locally
 }
 
 function hitPlayer(enemyBullet, playerSprite) {
