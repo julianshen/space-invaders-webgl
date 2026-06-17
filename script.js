@@ -805,7 +805,7 @@ function runIntro(scene) {
       crawlText.forEach((line, i) => {
         const y = 700 + i * 32;
         const txt = scene.add.text(400, y, line, {
-          fontFamily: 'monospace',
+          fontFamily: '"Pathway Gothic One", "Arial Narrow", sans-serif',
           fontSize: '16px',
           color: '#ffd700',
           align: 'center',
@@ -928,6 +928,10 @@ function enterDemo() {
   demoTexts.hint = scene.add.text(400, 500, 'PRESS ANY KEY TO START', {
     fontFamily: 'monospace', fontSize: '18px', color: '#888888'
   }).setOrigin(0.5).setDepth(300);
+
+  // 小外星人（Rei 指定：1.5x 放大 + 左右飄）
+  demoTexts.alien = scene.add.sprite(400, 420, 'invader').setDepth(300).setScale(1.5);
+  demoTexts.alienDir = 1;
 }
 
 function runDemo(scene) {
@@ -942,6 +946,12 @@ function runDemo(scene) {
   // 提示文字閃爍
   if (demoTexts.hint) {
     demoTexts.hint.setAlpha(0.4 + Math.sin(elapsed * 0.005) * 0.3);
+  }
+  // 小外星人左右飄移
+  if (demoTexts.alien) {
+    demoTexts.alien.x += demoTexts.alienDir * 0.6;
+    if (demoTexts.alien.x > 460) demoTexts.alienDir = -1;
+    if (demoTexts.alien.x < 340) demoTexts.alienDir = 1;
   }
 }
 
@@ -1277,8 +1287,8 @@ window.addEventListener('keydown', e => {
   // Demo 期間按任意鍵 → 回 intro
   if (gamePhase === 'demo') {
     Object.values(demoTexts).forEach(t => {
-      if (Array.isArray(t)) t.forEach(x => x.destroy());
-      else t.destroy();
+      if (Array.isArray(t)) t.forEach(x => { if (x && x.destroy) x.destroy(); });
+      else if (t && t.destroy) t.destroy();
     });
     demoTexts = {};
     gamePhase = 'intro';

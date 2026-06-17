@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <title>Space Invaders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pathway+Gothic+One&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pathway+Gothic+One&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -282,13 +282,13 @@
     }
 
     .arcade-btn.fire {
-      background: radial-gradient(circle at 35% 30%, #ff5555, #cc0000 60%, #880000);
-      border: 4px solid #661111;
+      background: radial-gradient(circle at 35% 30%, #cc4422, #881100 60%, #550800);
+      border: 4px solid #441111;
       box-shadow:
-        0 6px 0 #440000,
+        0 6px 0 #330000,
         0 8px 12px rgba(0,0,0,0.5),
         inset 0 -4px 6px rgba(0,0,0,0.3),
-        inset 0 2px 6px rgba(255,100,100,0.3);
+        inset 0 2px 6px rgba(255,140,80,0.25);
     }
     .arcade-btn.fire::after {
       content: '';
@@ -442,9 +442,7 @@
           </div>
         </div>
       </div>
-      <div class="cabinet-footer">
-        <div class="footer-text">© 2026 SPACE INVADERS</div>
-      </div>
+      <div class="cabinet-footer"></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>

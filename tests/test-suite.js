@@ -98,6 +98,82 @@
   });
 
   // =====================
+  // Visual Design (Rei's review — TDD)
+  // =====================
+  run('Visual: crawl text font is NOT monospace', () => {
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    introTexts = {};
+    introTexts.blueText = scene.add.text(400,300,'T',{}).setOrigin(0.5).setAlpha(0).setDepth(200);
+    introTexts.logo = scene.add.text(400,300,'T',{}).setOrigin(0.5).setVisible(false).setDepth(200);
+    crawlLines = [];
+    introStartTime = scene.time.now - 6500;
+    runIntro(scene);
+    if (crawlLines.length > 0) {
+      const font = crawlLines[0].style.fontFamily || '';
+      assert(!font.includes('monospace') && !font.includes('Press Start'),
+        'crawl font is NOT monospace/Press Start: ' + font);
+    }
+    crawlLines.forEach(t => t.destroy()); crawlLines = [];
+    Object.values(introTexts).forEach(t => t.destroy()); introTexts = {};
+  });
+
+  run('Visual: demo has INSERT COIN or blinking hint', () => {
+    gamePhase = 'gameover'; gameOver = true;
+    gameOverIdleStart = scene.time.now - 21000;
+    introTexts = {}; crawlLines = []; countdownTexts = {};
+    enterDemo();
+    const hasCoin = Object.values(demoTexts).some(t => {
+      if (!t || !t.text) return false;
+      return t.text.includes('INSERT COIN') || t.text.includes('COIN');
+    });
+    const hasHint = Object.values(demoTexts).some(t => {
+      if (!t || !t.text) return false;
+      return t.text.includes('PRESS') || t.text.includes('START');
+    });
+    assert(hasCoin || hasHint, 'demo needs INSERT COIN or PRESS START');
+    Object.values(demoTexts).forEach(t => {
+      if (Array.isArray(t)) t.forEach(x => x.destroy());
+      else if (t && t.destroy) t.destroy();
+    });
+    demoTexts = {};
+  });
+
+  run('Visual: demo alien is scaled up ≥1.3x', () => {
+    gamePhase = 'gameover'; gameOver = true;
+    gameOverIdleStart = scene.time.now - 21000;
+    introTexts = {}; crawlLines = []; countdownTexts = {};
+    enterDemo();
+    // Aliens are sprites with 'invader' texture, not text objects
+    const alienSprite = demoTexts.alien;
+    if (alienSprite) {
+      assert(alienSprite.scaleX >= 1.3, 'alien scaleX ≥1.3: ' + alienSprite.scaleX);
+    } else {
+      assert(false, 'no alien sprite in demo');
+    }
+    Object.values(demoTexts).forEach(t => {
+      if (Array.isArray(t)) t.forEach(x => x.destroy());
+      else if (t && t.destroy) t.destroy();
+    });
+    demoTexts = {};
+  });
+
+  run('Visual: FIRE button is dark red, not bright', () => {
+    const fireBtn = document.querySelector('.arcade-btn.fire');
+    if (fireBtn) {
+      const style = getComputedStyle(fireBtn);
+      const bg = style.background || style.backgroundColor || '';
+      // Bright red = #ff5555 or rgb(255, 85, 85). Should be darker.
+      const hasBright = bg.includes('255, 85, 85') || bg.includes('#ff5555');
+      assert(!hasBright, 'FIRE button should be dark red, not #ff5555');
+    }
+  });
+
+  run('Visual: no copyright in cabinet HTML', () => {
+    const body = document.body.innerText || '';
+    assert(!body.includes('©'), 'copyright symbol not in cabinet text');
+  });
+
+  // =====================
   // Game State (need game started first)
   // =====================
   // Ensure game is initialized
