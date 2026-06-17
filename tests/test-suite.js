@@ -63,6 +63,41 @@
   });
 
   // =====================
+  // Audio Playback (TDD)
+  // =====================
+  run('Audio: unlockAudio creates fanfare element', () => {
+    SoundManager._fanfareAudio = undefined;
+    SoundManager.unlockAudio();
+    assert(SoundManager._fanfareAudio instanceof HTMLAudioElement, 'fanfare element exists');
+  });
+
+  run('Audio: playFanfare sets playback path', () => {
+    SoundManager.unlockAudio();
+    // Simulate user gesture by ensuring AudioContext is running
+    if (SoundManager.ctx.state === 'suspended') SoundManager.ctx.resume();
+    SoundManager._lastPlaybackPath = null;
+    SoundManager.playFanfare();
+    // play() is async, but the path should be decided synchronously
+    // Either MP3 plays or we fall back to 8-bit
+    assert(SoundManager._lastPlaybackPath === 'mp3' || SoundManager._lastPlaybackPath === '8bit',
+      'playback path set: ' + SoundManager._lastPlaybackPath);
+    // Cleanup
+    if (SoundManager._fanfareAudio) {
+      SoundManager._fanfareAudio.pause();
+      SoundManager._fanfareAudio.currentTime = 0;
+    }
+  });
+
+  run('Audio: playFanfare without unlock does not crash', () => {
+    SoundManager._fanfareAudio = undefined;
+    SoundManager._lastPlaybackPath = null;
+    let threw = false;
+    try { SoundManager.playFanfare(); }
+    catch(e) { threw = true; }
+    assert(!threw, 'no crash without unlock');
+  });
+
+  // =====================
   // Game State (need game started first)
   // =====================
   // Ensure game is initialized

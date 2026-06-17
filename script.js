@@ -30,17 +30,23 @@ const SoundManager = {
   unlockAudio() {
     this.init();
     this.resume();
-    // Pre-create HTML Audio element + 短暫播放來解鎖
-    if (!this._fanfareAudio) {
-      this._fanfareAudio = new Audio('fanfare.mp3');
-      this._fanfareAudio.volume = 0;
-      this._fanfareAudio.play().then(() => {
-        this._fanfareAudio.pause();
-        this._fanfareAudio.currentTime = 0;
-        this._fanfareAudio.volume = 0.5;
-      }).catch(() => {});
+    // Pre-fetch + decode MP3 到 AudioBuffer，供後續 playFanfare 使用
+    if (!this._fanfareBuffer && !this._fanfareLoading) {
+      this._fanfareLoading = true;
+      fetch('fanfare.mp3')
+        .then(r => r.arrayBuffer())
+        .then(buf => this.ctx.decodeAudioData(buf))
+        .then(audioBuf => {
+          this._fanfareBuffer = audioBuf;
+          this._fanfareLoading = false;
+        })
+        .catch(() => {
+          this._fanfareLoading = false;
+        });
     }
   },
+
+  _lastPlaybackPath: null,  // TDD: tracks which path was used ('mp3' | '8bit')
 
   // 工具：建立過濾器 + gain 節點鏈
   _chain(filterOpts, gainVal) {
@@ -305,28 +311,50 @@ const SoundManager = {
     });
   },
 
-  // 播開場音樂：優先 MP3，fallback 8-bit
+  // 播開場音樂：優先 MP3（Web Audio decode），fallback 8-bit
   playFanfare() {
-    console.log('🎵 playFanfare called');
     this.init();
     this.resume();
-    // 試 MP3
-    if (!this._fanfareAudio) {
-      console.log('🎵 creating new Audio element');
-      this._fanfareAudio = new Audio('fanfare.mp3');
-      this._fanfareAudio.volume = 0.5;
+    const ctx = this.ctx;
+    if (!ctx) { this._lastPlaybackPath = '8bit'; this.fanfare(); return; }
+
+    // 路徑 1：MP3 AudioBuffer（Safari 相容，走 Web Audio API）
+    if (this._fanfareBuffer) {
+      this._lastPlaybackPath = 'mp3';
+      const src = ctx.createBufferSource();
+      src.buffer = this._fanfareBuffer;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.5;
+      src.connect(gain);
+      gain.connect(this.masterGain || ctx.destination);
+      src.start(0);
+      return;
     }
-    const audio = this._fanfareAudio;
-    audio.currentTime = 0;
-    console.log('🎵 attempting audio.play(), readyState=' + audio.readyState);
-    audio.play().then(() => {
-      console.log('🎵 MP3 playing!');
-    }).catch((err) => {
-      console.warn('🎵 MP3 blocked:', err.name, err.message);
-      // MP3 失敗 → 8-bit fallback
-      console.log('🎵 falling back to 8-bit');
-      this.sounds.fanfare();
-    });
+
+    // 路徑 2：還在 loading → 等 300ms 再試
+    if (this._fanfareLoading) {
+      this._lastPlaybackPath = 'mp3'; // optimistic
+      const check = () => {
+        if (this._fanfareBuffer) {
+          const src = ctx.createBufferSource();
+          src.buffer = this._fanfareBuffer;
+          const gain = ctx.createGain();
+          gain.gain.value = 0.5;
+          src.connect(gain);
+          gain.connect(this.masterGain || ctx.destination);
+          src.start(0);
+        } else {
+          this._lastPlaybackPath = '8bit';
+          this.fanfare();
+        }
+      };
+      setTimeout(check, 300);
+      return;
+    }
+
+    // 路徑 3：fetch/decode 失敗 → 8-bit fallback
+    this._lastPlaybackPath = '8bit';
+    this.fanfare();
   },
 
   play(name) {
