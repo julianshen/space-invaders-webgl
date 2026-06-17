@@ -307,17 +307,24 @@ const SoundManager = {
 
   // 播開場音樂：優先 MP3，fallback 8-bit
   playFanfare() {
+    console.log('🎵 playFanfare called');
     this.init();
     this.resume();
     // 試 MP3
     if (!this._fanfareAudio) {
+      console.log('🎵 creating new Audio element');
       this._fanfareAudio = new Audio('fanfare.mp3');
       this._fanfareAudio.volume = 0.5;
     }
     const audio = this._fanfareAudio;
     audio.currentTime = 0;
-    audio.play().catch(() => {
+    console.log('🎵 attempting audio.play(), readyState=' + audio.readyState);
+    audio.play().then(() => {
+      console.log('🎵 MP3 playing!');
+    }).catch((err) => {
+      console.warn('🎵 MP3 blocked:', err.name, err.message);
       // MP3 失敗 → 8-bit fallback
+      console.log('🎵 falling back to 8-bit');
       this.sounds.fanfare();
     });
   },
