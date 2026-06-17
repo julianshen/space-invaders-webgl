@@ -433,6 +433,7 @@ let highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0', 
 // === 片頭動畫 ===
 let gamePhase = 'intro'; // 'intro' | 'countdown' | 'playing' | 'gameover'
 let introStartTime = 0;
+let introIdleStart = 0; // intro idle timer → auto-transition to demo
 let introAliens = [];
 let introTexts = {};
 let crawlLines = [];
@@ -544,6 +545,7 @@ function create() {
   // ========== Star Wars Opening Crawl ==========
   gamePhase = 'intro';
   introStartTime = this.time.now;
+  introIdleStart = this.time.now;
 
   // Phase 1: Blue intro text
   introTexts.blueText = this.add.text(400, 300,
@@ -959,6 +961,10 @@ function update() {
   // 片頭動畫
   if (gamePhase === 'intro') {
     runIntro(this);
+    // 30 秒無操作 → 自動進 demo（Rei 要看到外星人飄移 😤）
+    if (this.time.now - introIdleStart > 30000) {
+      enterDemo.call(this);
+    }
     return;
   }
 
@@ -1276,9 +1282,12 @@ function restartGame() {
   gameReady = true;
 }
 
-// 第一次點擊/觸碰就解鎖 audio（繞過 autoplay policy）
+// 第一次點擊/觸碰就解鎖 audio（繞過 autoplay policy）+ reset intro idle
 ['click', 'touchstart'].forEach(evt => {
-  document.addEventListener(evt, () => SoundManager.unlockAudio(), { once: true });
+  document.addEventListener(evt, () => {
+    SoundManager.unlockAudio();
+    if (gamePhase === 'intro') introIdleStart = game.scene.scenes[0].time.now;
+  }, { once: true });
 });
 
 window.addEventListener('keydown', e => {
@@ -1293,9 +1302,15 @@ window.addEventListener('keydown', e => {
     demoTexts = {};
     gamePhase = 'intro';
     introStartTime = game.scene.scenes[0].time.now;
+    introIdleStart = game.scene.scenes[0].time.now;
     // 重建 intro
     rebuildIntro();
     return;
+  }
+
+  // 片頭期間：任意鍵重置 idle timer
+  if (gamePhase === 'intro') {
+    introIdleStart = game.scene.scenes[0].time.now;
   }
 
   // 片頭期間按空白鍵開始遊戲
