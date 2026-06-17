@@ -286,6 +286,7 @@ let gamePhase = 'intro'; // 'intro' | 'countdown' | 'playing' | 'gameover'
 let introStartTime = 0;
 let introAliens = [];
 let introTexts = {};
+let crawlLines = [];
 let countdownStart = 0;
 let countdownTexts = {};
 
@@ -391,43 +392,31 @@ function create() {
     hideOnComplete: true
   });
 
-  // ========== 片頭動畫 ==========
+  // ========== Star Wars Opening Crawl ==========
   gamePhase = 'intro';
   introStartTime = this.time.now;
 
-  // 入侵警報文字
-  introTexts.incoming = this.add.text(400, 180, 'INCOMING\nTRANSMISSION...', {
+  // Phase 1: Blue intro text
+  introTexts.blueText = this.add.text(400, 300,
+    'A long time ago in a galaxy\nfar, far away....', {
     fontFamily: 'monospace',
-    fontSize: '28px',
-    color: '#ffdd00',
+    fontSize: '22px',
+    color: '#4a9eff',
     align: 'center',
-    fontStyle: 'bold'
+    fontStyle: 'italic'
   }).setOrigin(0.5).setAlpha(0).setDepth(200);
 
-  introTexts.invaders = this.add.text(400, 200, 'INVADERS!', {
+  // Phase 2: Big yellow logo
+  introTexts.logo = this.add.text(400, 280, 'SPACE\nINVADERS', {
     fontFamily: 'monospace',
-    fontSize: '72px',
-    color: '#ff0000',
+    fontSize: '56px',
+    color: '#ffd700',
+    align: 'center',
     fontStyle: 'bold'
   }).setOrigin(0.5).setVisible(false).setDepth(200);
 
-  introTexts.ready = this.add.text(400, 330, 'GET READY', {
-    fontFamily: 'monospace',
-    fontSize: '32px',
-    color: '#00ff00'
-  }).setOrigin(0.5).setVisible(false).setDepth(200);
-
-  // 片頭外星人 V 字編隊（從天而降）
-  for (let i = 0; i < 8; i++) {
-    const alien = this.add.sprite(
-      200 + (i % 4) * 140 + (Math.floor(i / 4) * 60),
-      -60 - i * 30,
-      'invader'
-    );
-    alien.setDisplaySize(42, 24);
-    alien.setDepth(150);
-    introAliens.push(alien);
-  }
+  // Phase 3: Crawl text (will be populated in runIntro)
+  crawlLines = [];
 }
 
 function startPlaying() {
@@ -556,40 +545,29 @@ function updateScoreText() {
 // 重建片頭（從 demo 回來時用）
 function rebuildIntro() {
   const scene = game.scene.scenes[0];
-  introAliens.forEach(a => { if (a && a.destroy) a.destroy(); });
+  crawlLines.forEach(t => { if (t && t.destroy) t.destroy(); });
+  crawlLines = [];
   Object.values(introTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
-  introAliens = [];
   introTexts = {};
 
-  introTexts.incoming = scene.add.text(400, 180, 'INCOMING\nTRANSMISSION...', {
-    fontFamily: 'monospace', fontSize: '28px', color: '#ffdd00',
-    align: 'center', fontStyle: 'bold'
+  introTexts.blueText = scene.add.text(400, 300,
+    'A long time ago in a galaxy\nfar, far away....', {
+    fontFamily: 'monospace', fontSize: '22px', color: '#4a9eff',
+    align: 'center', fontStyle: 'italic'
   }).setOrigin(0.5).setAlpha(0).setDepth(200);
 
-  introTexts.invaders = scene.add.text(400, 200, 'INVADERS!', {
-    fontFamily: 'monospace', fontSize: '72px', color: '#ff0000', fontStyle: 'bold'
+  introTexts.logo = scene.add.text(400, 280, 'SPACE\nINVADERS', {
+    fontFamily: 'monospace', fontSize: '56px', color: '#ffd700',
+    align: 'center', fontStyle: 'bold'
   }).setOrigin(0.5).setVisible(false).setDepth(200);
-
-  introTexts.ready = scene.add.text(400, 330, 'GET READY', {
-    fontFamily: 'monospace', fontSize: '32px', color: '#00ff00'
-  }).setOrigin(0.5).setVisible(false).setDepth(200);
-
-  for (let i = 0; i < 8; i++) {
-    const alien = scene.add.sprite(
-      200 + (i % 4) * 140 + (Math.floor(i / 4) * 60), -60 - i * 30, 'invader'
-    );
-    alien.setDisplaySize(42, 24);
-    alien.setDepth(150);
-    introAliens.push(alien);
-  }
 }
 
 // 跳過片頭（按鍵或觸控觸發）
 function skipIntro() {
   if (gamePhase !== 'intro') return;
-  introAliens.forEach(a => a.destroy());
-  Object.values(introTexts).forEach(tx => tx.destroy());
-  introAliens = [];
+  crawlLines.forEach(t => { if (t && t.destroy) t.destroy(); });
+  crawlLines = [];
+  Object.values(introTexts).forEach(tx => { if (tx && tx.destroy) tx.destroy(); });
   introTexts = {};
   const scene = game.scene.scenes[0];
 
@@ -604,7 +582,7 @@ function skipIntro() {
   }).setOrigin(0.5).setDepth(300).setVisible(false);
 }
 
-// 片頭動畫邏輯
+// Star Wars Opening Crawl 動畫
 function runIntro(scene) {
   const elapsed = scene.time.now - introStartTime;
   const t = elapsed / 1000; // 秒數
@@ -612,55 +590,115 @@ function runIntro(scene) {
   // 星空加速
   if (starfield) starfield.tilePositionY -= 1.5;
 
-  if (t < 1.2) {
-    // Phase 1: INCOMING TRANSMISSION... 淡入
-    introTexts.incoming.setAlpha(Math.min(1, t / 0.8));
-  } else if (t < 3.0) {
-    // Phase 2: 外星人從天而降
-    introTexts.incoming.setAlpha(Math.max(0, 1 - (t - 1.2) / 0.4));
-    const p = Math.min(1, (t - 1.2) / 1.5); // 0→1
-    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-    introAliens.forEach((alien, i) => {
-      const targetY = 120 + (i % 4) * 65 + Math.floor(i / 4) * 30;
-      const startY = -80 - i * 35;
-      alien.y = startY + (targetY - startY) * eased;
-      alien.x += Math.sin(elapsed * 0.003 + i) * 0.6; // 微微搖晃
-    });
-  } else if (t < 4.5) {
-    // Phase 3: INVADERS! 震入
-    if (!introTexts.invaders.visible) {
-      introTexts.invaders.setVisible(true);
-      introTexts.incoming.setVisible(false);
-      introTexts._shakeStart = elapsed;
+  // === Phase 1 (0-3s): Blue intro text fades in/out ===
+  if (t < 3.0) {
+    // Fade in over 1s, hold 1s, fade out last 1s
+    if (t < 1.0) {
+      introTexts.blueText.setAlpha(Math.min(1, t / 1.0));
+    } else if (t < 2.0) {
+      introTexts.blueText.setAlpha(1);
+    } else {
+      introTexts.blueText.setAlpha(Math.max(0, 1 - (t - 2.0) / 1.0));
     }
-    // 用 sin 做震盪效果，不用 tween（方便循環時重設）
-    const shakeT = (elapsed - (introTexts._shakeStart || elapsed)) / 1000;
-    const shake = 1 + Math.sin(shakeT * 30) * 0.15;
-    introTexts.invaders.setScale(shake);
-    // 紅光閃爍
-    introTexts.invaders.setAlpha(0.5 + Math.abs(Math.sin(shakeT * 8)) * 0.5);
-    // 外星人微微上下浮動
-    introAliens.forEach((alien, i) => {
-      alien.y += Math.sin(elapsed * 0.008 + i) * 0.4;
+  }
+
+  // === Phase 2 (3-6s): Logo fades in/out ===
+  else if (t < 6.0) {
+    const pt = t - 3.0; // phase time
+    if (!introTexts.logo.visible && pt > 0) {
+      introTexts.logo.setVisible(true);
+      introTexts.blueText.setVisible(false);
+    }
+    if (pt < 1.0) {
+      introTexts.logo.setAlpha(Math.min(1, pt / 1.0));
+      // Scale from 0.5 to 1
+      introTexts.logo.setScale(0.5 + 0.5 * (pt / 1.0));
+    } else if (pt < 2.0) {
+      introTexts.logo.setAlpha(1);
+    } else {
+      introTexts.logo.setAlpha(Math.max(0, 1 - (pt - 2.0) / 1.0));
+    }
+  }
+
+  // === Phase 3 (6-14s): Crawl text scrolls upward ===
+  else {
+    // Build crawl lines on first frame
+    if (crawlLines.length === 0) {
+      introTexts.logo.setVisible(false);
+      const crawlText = [
+        'EPISODE IV',
+        '',
+        'A NEW HOPE',
+        '',
+        'It is a period of civil war.',
+        'Rebel spaceships, striking',
+        'from a hidden base, have won',
+        'their first victory against',
+        'the evil Galactic Empire.',
+        '',
+        'During the battle, Rebel',
+        'spies managed to steal',
+        'secret plans to the Empire\'s',
+        'ultimate weapon, the DEATH',
+        'STAR, an armored space',
+        'station with enough power',
+        'to destroy an entire planet.',
+        '',
+        'Pursued by the Empire\'s',
+        'sinister agents, Princess',
+        'Leia races home aboard her',
+        'starship, custodian of the',
+        'stolen plans that can save',
+        'her people and restore',
+        'freedom to the galaxy....'
+      ];
+      crawlText.forEach((line, i) => {
+        const y = 700 + i * 32;
+        const txt = scene.add.text(400, y, line, {
+          fontFamily: 'monospace',
+          fontSize: '16px',
+          color: '#ffd700',
+          align: 'center',
+          fontStyle: line.startsWith('EPISODE') || line === 'A NEW HOPE' ? 'bold' : 'normal'
+        }).setOrigin(0.5).setDepth(200);
+        crawlLines.push(txt);
+      });
+    }
+
+    const pt = t - 6.0;
+    const crawlSpeed = 0.7; // pixels per ms
+    const crawlDuration = 8000; // ms
+
+    crawlLines.forEach((txt, i) => {
+      const baseY = 700 + i * 32;
+      const newY = baseY - pt * crawlSpeed;
+      txt.y = newY;
+
+      // Perspective effect: scale based on y position
+      const viewCenter = 300;
+      const distFromCenter = newY - viewCenter;
+      const perspective = 1 - Math.abs(distFromCenter) / 500;
+      const scale = Math.max(0.3, Math.min(1.0, perspective));
+      txt.setScale(scale);
+
+      // Fade at edges
+      const alpha = Math.max(0.1, Math.min(1, perspective + 0.2));
+      txt.setAlpha(alpha);
+
+      // Clean up lines that have scrolled off screen
+      if (newY < -50) {
+        txt.setVisible(false);
+      }
     });
-  } else if (t < 5.5) {
-    // Phase 4: GET READY 閃爍
-    introTexts.ready.setVisible(true);
-    introTexts.ready.setAlpha(Math.sin(elapsed * 0.012) > 0 ? 1 : 0.15);
-    introTexts.invaders.setAlpha(Math.max(0.15, 1 - (t - 4.5) / 1.0));
-    introAliens.forEach(a => { a.alpha -= 0.02; });
-  } else {
-    // 循環片頭：重設所有狀態回到 Phase 1
-    introStartTime = scene.time.now;
-    introTexts.incoming.setAlpha(0).setVisible(true);
-    introTexts.invaders.setVisible(false).setScale(1).setAlpha(1);
-    introTexts.ready.setVisible(false).setAlpha(1);
-    delete introTexts._shakeStart;
-    // 外星人回到天頂
-    introAliens.forEach((alien, i) => {
-      alien.y = -60 - i * 30;
-      alien.alpha = 1;
-    });
+
+    // Loop back after crawl finishes
+    if (pt > crawlDuration) {
+      crawlLines.forEach(t => t.destroy());
+      crawlLines = [];
+      introTexts.blueText.setAlpha(0).setVisible(true);
+      introTexts.logo.setVisible(false).setScale(1).setAlpha(1);
+      introStartTime = scene.time.now;
+    }
   }
 }
 
@@ -703,15 +741,15 @@ function enterDemo() {
   // 清除可能殘留的 intro / countdown 文字
   Object.values(introTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
   Object.values(countdownTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
-  introAliens.forEach(a => { if (a && a.destroy) a.destroy(); });
-  introAliens = []; introTexts = {}; countdownTexts = {};
+  crawlLines.forEach(t => { if (t && t.destroy) t.destroy(); });
+  crawlLines = []; introTexts = {}; countdownTexts = {};
 
   const scene = game.scene.scenes[0];
   const board = getLeaderboard();
 
   // 標題
-  demoTexts.title = scene.add.text(400, 120, '★ HIGH SCORES ★', {
-    fontFamily: 'monospace', fontSize: '36px', color: '#ffdd00', fontStyle: 'bold'
+  demoTexts.title = scene.add.text(400, 120, '╔══════════════╗\n║  HIGH SCORES  ║\n╚══════════════╝', {
+    fontFamily: 'monospace', fontSize: '22px', color: '#ffd700', fontStyle: 'bold', align: 'center'
   }).setOrigin(0.5).setDepth(300).setAlpha(0);
 
   // 排行榜條目

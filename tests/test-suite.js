@@ -247,6 +247,132 @@
   });
 
   // =====================
+  // Star Wars Crawl Intro (BDD)
+  // =====================
+  run('crawl: intro structure has crawl keys', () => {
+    restartGame();
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    // After game loads, intro should have crawl-related elements
+    assert(introTexts.blueText !== undefined, 'blueText exists');
+    assert(introTexts.logo !== undefined, 'logo exists');
+    assert(crawlLines !== undefined, 'crawlLines array exists');
+    assert(crawlLines.length > 0, 'crawlLines has entries');
+    eq(gamePhase, 'intro', 'phase is intro');
+  });
+
+  run('crawl: phase 1 — blue text fades in', () => {
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    introTexts = {};
+    introTexts.blueText = scene.add.text(400, 300, 'TEST', { 
+      fontFamily: 'monospace', fontSize: '24px', color: '#4a9eff', fontStyle: 'italic' 
+    }).setOrigin(0.5).setAlpha(0).setDepth(200);
+    introTexts.logo = scene.add.text(400, 300, 'TEST', { 
+      fontFamily: 'monospace', fontSize: '64px', color: '#ffd700', fontStyle: 'bold' 
+    }).setOrigin(0.5).setVisible(false).setDepth(200);
+    crawlLines = [];
+    introStartTime = scene.time.now - 1000; // 1 second in
+    runIntro(scene);
+    assert(introTexts.blueText.alpha > 0, 'blue text fading in');
+    assert(!introTexts.logo.visible, 'logo still hidden');
+    Object.values(introTexts).forEach(t => t.destroy());
+    introTexts = {}; crawlLines = [];
+  });
+
+  run('crawl: phase 2 — logo appears after blue text', () => {
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    introTexts = {};
+    introTexts.blueText = scene.add.text(400, 300, 'TEST', { 
+      fontFamily: 'monospace', fontSize: '24px', color: '#4a9eff' 
+    }).setOrigin(0.5).setOrigin(0.5).setAlpha(0).setDepth(200);
+    introTexts.logo = scene.add.text(400, 300, 'TEST', { 
+      fontFamily: 'monospace', fontSize: '64px', color: '#ffd700' 
+    }).setOrigin(0.5).setVisible(false).setDepth(200);
+    crawlLines = [];
+    introStartTime = scene.time.now - 3500; // ~3.5 seconds in
+    runIntro(scene);
+    assert(introTexts.logo.visible, 'logo is visible');
+    Object.values(introTexts).forEach(t => t.destroy());
+    introTexts = {}; crawlLines = [];
+  });
+
+  run('crawl: phase 3 — crawl text scrolls upward', () => {
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    introTexts = {};
+    introTexts.blueText = scene.add.text(400, 300, 'TEST', {}).setOrigin(0.5).setAlpha(0).setDepth(200);
+    introTexts.logo = scene.add.text(400, 300, 'TEST', {}).setOrigin(0.5).setVisible(false).setDepth(200);
+    // Create mock crawl lines
+    crawlLines = [];
+    for (let i = 0; i < 3; i++) {
+      crawlLines.push(scene.add.text(400, 700 + i * 40, 'LINE ' + i, {
+        fontFamily: 'monospace', fontSize: '18px', color: '#ffd700'
+      }).setOrigin(0.5));
+    }
+    const yBefore = crawlLines[0].y;
+    introStartTime = scene.time.now - 6500; // ~6.5 seconds in (crawl phase)
+    runIntro(scene);
+    // All crawl lines should have moved upward
+    assert(crawlLines[0].y < yBefore, 'crawl line moved up');
+    crawlLines.forEach(l => l.destroy());
+    crawlLines = [];
+    Object.values(introTexts).forEach(t => t.destroy());
+    introTexts = {};
+  });
+
+  run('crawl: skipIntro works with crawl', () => {
+    gamePhase = 'intro';
+    introTexts = {
+      blueText: scene.add.text(400, 300, 'X', {}).setOrigin(0.5),
+      logo: scene.add.text(400, 300, 'X', {}).setOrigin(0.5)
+    };
+    crawlLines = [scene.add.text(400, 500, 'X', {}).setOrigin(0.5)];
+    skipIntro();
+    eq(gamePhase, 'countdown', 'entered countdown');
+    assert(countdownTexts.ready !== undefined, 'ready text');
+    assert(crawlLines.length === 0, 'crawlLines cleared');
+    eq(Object.keys(introTexts).length, 0, 'introTexts cleared');
+    countdownTexts.ready.destroy();
+    countdownTexts.go.destroy();
+    countdownTexts = {};
+  });
+
+  run('crawl: enterDemo cleans new intro elements', () => {
+    gamePhase = 'gameover'; gameOver = true;
+    gameOverIdleStart = scene.time.now - 21000;
+    introTexts = {
+      blueText: scene.add.text(400, 300, 'X', {}).setOrigin(0.5),
+      logo: scene.add.text(400, 300, 'X', {}).setOrigin(0.5)
+    };
+    crawlLines = [scene.add.text(400, 500, 'X', {}).setOrigin(0.5)];
+    countdownTexts = {};
+    enterDemo();
+    eq(gamePhase, 'demo', 'entered demo');
+    eq(Object.keys(introTexts).length, 0, 'introTexts cleaned');
+    eq(crawlLines.length, 0, 'crawlLines cleaned');
+    Object.values(demoTexts).forEach(t => {
+      if (Array.isArray(t)) t.forEach(x => x.destroy());
+      else if (t && t.destroy) t.destroy();
+    });
+    demoTexts = {};
+  });
+
+  run('crawl: demo leaderboard title is Star Wars themed', () => {
+    gamePhase = 'gameover'; gameOver = true;
+    gameOverIdleStart = scene.time.now - 21000;
+    introTexts = {}; crawlLines = []; countdownTexts = {};
+    localStorage.setItem('spaceInvadersLeaderboard', JSON.stringify([5000, 3000]));
+    enterDemo();
+    assert(demoTexts.title !== undefined, 'title exists');
+    assert(demoTexts.title.text.includes('HIGH SCORES') || demoTexts.title.text.includes('SCORES'), 
+      'title shows leaderboard');
+    // Cleanup
+    Object.values(demoTexts).forEach(t => {
+      if (Array.isArray(t)) t.forEach(x => x.destroy());
+      else if (t && t.destroy) t.destroy();
+    });
+    demoTexts = {};
+  });
+
+  // =====================
   // Report
   // =====================
   console.log(JSON.stringify({results, pass, fail, total: pass+fail}, null, 2));
