@@ -666,8 +666,8 @@ function runIntro(scene) {
     }
 
     const pt = t - 6.0;
-    const crawlSpeed = 0.7; // pixels per ms
-    const crawlDuration = 8000; // ms
+    const crawlSpeed = 120; // pixels per second
+    const crawlDuration = 10; // seconds
 
     crawlLines.forEach((txt, i) => {
       const baseY = 700 + i * 32;
@@ -692,7 +692,7 @@ function runIntro(scene) {
     });
 
     // Loop back after crawl finishes
-    if (pt > crawlDuration) {
+    if (pt >= crawlDuration) {
       crawlLines.forEach(t => t.destroy());
       crawlLines = [];
       introTexts.blueText.setAlpha(0).setVisible(true);
