@@ -26,6 +26,22 @@ const SoundManager = {
     }
   },
 
+  // 解鎖 audio：第一次使用者互動時呼叫，繞過 autoplay policy
+  unlockAudio() {
+    this.init();
+    this.resume();
+    // Pre-create HTML Audio element + 短暫播放來解鎖
+    if (!this._fanfareAudio) {
+      this._fanfareAudio = new Audio('fanfare.mp3');
+      this._fanfareAudio.volume = 0;
+      this._fanfareAudio.play().then(() => {
+        this._fanfareAudio.pause();
+        this._fanfareAudio.currentTime = 0;
+        this._fanfareAudio.volume = 0.5;
+      }).catch(() => {});
+    }
+  },
+
   // 工具：建立過濾器 + gain 節點鏈
   _chain(filterOpts, gainVal) {
     const filter = this.ctx.createBiquadFilter();
@@ -1215,9 +1231,13 @@ function restartGame() {
   gameReady = true;
 }
 
+// 第一次點擊/觸碰就解鎖 audio（繞過 autoplay policy）
+['click', 'touchstart'].forEach(evt => {
+  document.addEventListener(evt, () => SoundManager.unlockAudio(), { once: true });
+});
+
 window.addEventListener('keydown', e => {
-  SoundManager.init();
-  SoundManager.resume();
+  SoundManager.unlockAudio();
 
   // Demo 期間按任意鍵 → 回 intro
   if (gamePhase === 'demo') {
@@ -1255,7 +1275,7 @@ function setupTouchControls() {
   const joyBase = document.querySelector('.joystick-base');
   const joyStick = document.querySelector('.joystick-stick');
 
-  const unlockAudio = () => { SoundManager.init(); SoundManager.resume(); };
+  const unlockAudio = () => { SoundManager.unlockAudio(); };
 
   if (fireBtn) {
     const press = e => {
