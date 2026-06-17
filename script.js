@@ -282,10 +282,12 @@ const touchState = { left: false, right: false, fire: false };
 let highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0', 10);
 
 // === 片頭動畫 ===
-let gamePhase = 'intro'; // 'intro' | 'playing' | 'gameover'
+let gamePhase = 'intro'; // 'intro' | 'countdown' | 'playing' | 'gameover'
 let introStartTime = 0;
 let introAliens = [];
 let introTexts = {};
+let countdownStart = 0;
+let countdownTexts = {};
 
 function preload() {
   // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
@@ -537,7 +539,16 @@ function skipIntro() {
   introAliens = [];
   introTexts = {};
   const scene = game.scene.scenes[0];
-  startPlaying.call(scene);
+
+  // 進入倒數階段
+  gamePhase = 'countdown';
+  countdownStart = scene.time.now;
+  countdownTexts.ready = scene.add.text(400, 250, 'READY?', {
+    fontFamily: 'monospace', fontSize: '52px', color: '#ffff00', fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(300).setAlpha(0);
+  countdownTexts.go = scene.add.text(400, 250, 'GO!', {
+    fontFamily: 'monospace', fontSize: '64px', color: '#00ff00', fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(300).setVisible(false);
 }
 
 // 片頭動畫邏輯
@@ -600,10 +611,47 @@ function runIntro(scene) {
   }
 }
 
+// 倒數階段：READY? → GO!
+function runCountdown(scene) {
+  const elapsed = scene.time.now - countdownStart;
+  const t = elapsed / 1000;
+
+  // 星空繼續滾
+  if (starfield) starfield.tilePositionY -= 0.3;
+
+  if (t < 1.2) {
+    // READY? 淡入
+    countdownTexts.ready.setAlpha(Math.min(1, t / 0.3));
+  } else if (t < 2.0) {
+    // GO! 出現
+    if (!countdownTexts.go.visible) {
+      countdownTexts.go.setVisible(true);
+      countdownTexts.go.setScale(0.3);
+      scene.tweens.add({
+        targets: countdownTexts.go,
+        scaleX: 1, scaleY: 1,
+        duration: 150, ease: 'Back.easeOut'
+      });
+    }
+    countdownTexts.ready.setAlpha(Math.max(0, 1 - (t - 1.2) / 0.3));
+  } else {
+    // 清理倒數，開始遊戲
+    Object.values(countdownTexts).forEach(tx => tx.destroy());
+    countdownTexts = {};
+    startPlaying.call(scene);
+  }
+}
+
 function update() {
   // 片頭動畫
   if (gamePhase === 'intro') {
     runIntro(this);
+    return;
+  }
+
+  // 倒數階段
+  if (gamePhase === 'countdown') {
+    runCountdown(this);
     return;
   }
 
