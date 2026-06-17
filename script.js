@@ -961,8 +961,8 @@ function update() {
   // 片頭動畫
   if (gamePhase === 'intro') {
     runIntro(this);
-    // 30 秒無操作 → 自動進 demo（Rei 要看到外星人飄移 😤）
-    if (this.time.now - introIdleStart > 30000) {
+    // 15 秒無操作 → 自動進 demo（Rei 說 30 秒太久，誰會盯螢幕 30 秒啦 😒）
+    if (this.time.now - introIdleStart > 15000) {
       enterDemo.call(this);
     }
     return;
