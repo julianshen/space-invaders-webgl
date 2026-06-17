@@ -208,8 +208,7 @@ const SoundManager = {
     }
   },
 
-  // === 8-bit 開場旋律 ===
-  // 星際大戰風，簡單有記憶點
+  // === 8-bit 開場旋律（fallback）===
   fanfare() {
     const ctx = SoundManager.ctx;
     if (!ctx) return;
@@ -287,6 +286,23 @@ const SoundManager = {
       g2.connect(SoundManager.masterGain);
       osc2.start(t + startBeat * beat);
       osc2.stop(t + (startBeat + durBeat) * beat + 0.05);
+    });
+  },
+
+  // 播開場音樂：優先 MP3，fallback 8-bit
+  playFanfare() {
+    this.init();
+    this.resume();
+    // 試 MP3
+    if (!this._fanfareAudio) {
+      this._fanfareAudio = new Audio('fanfare.mp3');
+      this._fanfareAudio.volume = 0.5;
+    }
+    const audio = this._fanfareAudio;
+    audio.currentTime = 0;
+    audio.play().catch(() => {
+      // MP3 失敗 → 8-bit fallback
+      this.sounds.fanfare();
     });
   },
 
@@ -707,7 +723,7 @@ function runIntro(scene) {
     // Build crawl lines on first frame
     if (crawlLines.length === 0) {
       introTexts.logo.setVisible(false);
-      SoundManager.play('fanfare'); // 8-bit 開場旋律
+      SoundManager.playFanfare(); // 開場音樂（MP3 or 8-bit fallback）
       const crawlText = [
         'EPISODE IV',
         '',
