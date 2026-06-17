@@ -281,6 +281,12 @@ const touchState = { left: false, right: false, fire: false };
 // === HIGH SCORE (localStorage) ===
 let highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0', 10);
 
+// === 片頭動畫 ===
+let gamePhase = 'intro'; // 'intro' | 'playing' | 'gameover'
+let introStartTime = 0;
+let introAliens = [];
+let introTexts = {};
+
 function preload() {
   // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
   this.load.image('spaceship', 'spaceship.png');
@@ -354,53 +360,6 @@ function create() {
     expTex.add(f, 0, f * expSize, 0, expSize, expSize);
   }
 
-  // Player - 強制設定合理尺寸
-  player = this.physics.add.sprite(400, 550, 'spaceship');
-  player.setDisplaySize(48, 24);
-  player.setCollideWorldBounds(true);
-
-  cursors = this.input.keyboard.createCursorKeys();
-  // 射擊改用 update 內輪詢（cursors.space / 觸控火力鍵），按住即可連發（仍受冷卻限制）。
-
-  // 真正的物件池：用 get()/disableBody() 回收，不再每次 create/destroy。
-  bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 12 });
-  enemyBullets = this.physics.add.group({ defaultKey: 'ebullet', maxSize: 20 });
-  invaders = this.physics.add.group();
-  explosions = this.add.group();
-
-  // UI 文字統一給高 depth，否則之後在 createWave 建立的 invaders（同 depth 0、
-  // 但較晚加入 display list）會蓋在分數 / GAME OVER 文字上面。
-  scoreText = this.add.text(16, 16, buildScoreText(), {
-    fontFamily: 'monospace',
-    fontSize: '22px',
-    color: '#00ff00'
-  }).setDepth(100);
-
-  // Game Over 畫面 (戲劇版)
-  gameOverText = this.add.text(400, 220, 'GAME OVER', {
-    fontFamily: 'monospace',
-    fontSize: '80px',
-    color: '#ff0000',
-    fontStyle: 'bold'
-  }).setOrigin(0.5).setDepth(100);
-  gameOverText.setVisible(false);
-
-  // 高分另開一個文字物件。原本塞進 80px 的 gameOverText 裡，
-  // "HIGH SCORE: 00000" 在等寬字下約 816px，會超出 800px 畫布被裁切。
-  finalScoreText = this.add.text(400, 320, '', {
-    fontFamily: 'monospace',
-    fontSize: '30px',
-    color: '#ffdd00'
-  }).setOrigin(0.5).setDepth(100);
-  finalScoreText.setVisible(false);
-
-  restartText = this.add.text(400, 400, 'PRESS SPACE TO RESTART', {
-    fontFamily: 'monospace',
-    fontSize: '28px',
-    color: '#ffff00'
-  }).setOrigin(0.5).setDepth(100);
-  restartText.setVisible(false);
-
   this.anims.create({
     key: 'explode_pro',
     frames: this.anims.generateFrameNumbers('explode_sheet', { start: 0, end: 7 }),
@@ -408,13 +367,83 @@ function create() {
     hideOnComplete: true
   });
 
+  // ========== 片頭動畫 ==========
+  gamePhase = 'intro';
+  introStartTime = this.time.now;
+
+  // 入侵警報文字
+  introTexts.incoming = this.add.text(400, 180, 'INCOMING\nTRANSMISSION...', {
+    fontFamily: 'monospace',
+    fontSize: '28px',
+    color: '#ffdd00',
+    align: 'center',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setAlpha(0).setDepth(200);
+
+  introTexts.invaders = this.add.text(400, 200, 'INVADERS!', {
+    fontFamily: 'monospace',
+    fontSize: '72px',
+    color: '#ff0000',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setVisible(false).setDepth(200);
+
+  introTexts.ready = this.add.text(400, 330, 'GET READY', {
+    fontFamily: 'monospace',
+    fontSize: '32px',
+    color: '#00ff00'
+  }).setOrigin(0.5).setVisible(false).setDepth(200);
+
+  // 片頭外星人 V 字編隊（從天而降）
+  for (let i = 0; i < 8; i++) {
+    const alien = this.add.sprite(
+      200 + (i % 4) * 140 + (Math.floor(i / 4) * 60),
+      -60 - i * 30,
+      'invader'
+    );
+    alien.setDisplaySize(42, 24);
+    alien.setDepth(150);
+    introAliens.push(alien);
+  }
+}
+
+function startPlaying() {
+  // Player - 強制設定合理尺寸
+  player = this.physics.add.sprite(400, 550, 'spaceship');
+  player.setDisplaySize(48, 24);
+  player.setCollideWorldBounds(true);
+
+  cursors = this.input.keyboard.createCursorKeys();
+
+  // 真正的物件池
+  bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 12 });
+  enemyBullets = this.physics.add.group({ defaultKey: 'ebullet', maxSize: 20 });
+  invaders = this.physics.add.group();
+  explosions = this.add.group();
+
+  // UI 文字
+  scoreText = this.add.text(16, 16, buildScoreText(), {
+    fontFamily: 'monospace', fontSize: '22px', color: '#00ff00'
+  }).setDepth(100);
+
+  gameOverText = this.add.text(400, 220, 'GAME OVER', {
+    fontFamily: 'monospace', fontSize: '80px', color: '#ff0000', fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(100).setVisible(false);
+
+  finalScoreText = this.add.text(400, 320, '', {
+    fontFamily: 'monospace', fontSize: '30px', color: '#ffdd00'
+  }).setOrigin(0.5).setDepth(100).setVisible(false);
+
+  restartText = this.add.text(400, 400, 'PRESS SPACE TO RESTART', {
+    fontFamily: 'monospace', fontSize: '28px', color: '#ffff00'
+  }).setOrigin(0.5).setDepth(100).setVisible(false);
+
   createWave.call(this, 1);
   this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
   this._playerHitCollider = this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
 
-  // 生命數圖示（右上角顯示小戰機）
   drawLives.call(this);
   gameReady = true;
+  gamePhase = 'playing';
 }
 
 function createWave(waveNum) {
@@ -500,7 +529,84 @@ function updateScoreText() {
   scoreText.setText(buildScoreText());
 }
 
+// 跳過片頭（按鍵或觸控觸發）
+function skipIntro() {
+  if (gamePhase !== 'intro') return;
+  introAliens.forEach(a => a.destroy());
+  Object.values(introTexts).forEach(tx => tx.destroy());
+  introAliens = [];
+  introTexts = {};
+  const scene = game.scene.scenes[0];
+  startPlaying.call(scene);
+}
+
+// 片頭動畫邏輯
+function runIntro(scene) {
+  const elapsed = scene.time.now - introStartTime;
+  const t = elapsed / 1000; // 秒數
+
+  // 星空加速
+  if (starfield) starfield.tilePositionY -= 1.5;
+
+  if (t < 1.2) {
+    // Phase 1: INCOMING TRANSMISSION... 淡入
+    introTexts.incoming.setAlpha(Math.min(1, t / 0.8));
+  } else if (t < 3.0) {
+    // Phase 2: 外星人從天而降
+    introTexts.incoming.setAlpha(Math.max(0, 1 - (t - 1.2) / 0.4));
+    const p = Math.min(1, (t - 1.2) / 1.5); // 0→1
+    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+    introAliens.forEach((alien, i) => {
+      const targetY = 120 + (i % 4) * 65 + Math.floor(i / 4) * 30;
+      const startY = -80 - i * 35;
+      alien.y = startY + (targetY - startY) * eased;
+      alien.x += Math.sin(elapsed * 0.003 + i) * 0.6; // 微微搖晃
+    });
+  } else if (t < 4.5) {
+    // Phase 3: INVADERS! 震入
+    if (!introTexts.invaders.visible) {
+      introTexts.invaders.setVisible(true);
+      introTexts.incoming.setVisible(false);
+      introTexts._shakeStart = elapsed;
+    }
+    // 用 sin 做震盪效果，不用 tween（方便循環時重設）
+    const shakeT = (elapsed - (introTexts._shakeStart || elapsed)) / 1000;
+    const shake = 1 + Math.sin(shakeT * 30) * 0.15;
+    introTexts.invaders.setScale(shake);
+    // 紅光閃爍
+    introTexts.invaders.setAlpha(0.5 + Math.abs(Math.sin(shakeT * 8)) * 0.5);
+    // 外星人微微上下浮動
+    introAliens.forEach((alien, i) => {
+      alien.y += Math.sin(elapsed * 0.008 + i) * 0.4;
+    });
+  } else if (t < 5.5) {
+    // Phase 4: GET READY 閃爍
+    introTexts.ready.setVisible(true);
+    introTexts.ready.setAlpha(Math.sin(elapsed * 0.012) > 0 ? 1 : 0.15);
+    introTexts.invaders.setAlpha(Math.max(0.15, 1 - (t - 4.5) / 1.0));
+    introAliens.forEach(a => { a.alpha -= 0.02; });
+  } else {
+    // 循環片頭：重設所有狀態回到 Phase 1
+    introStartTime = scene.time.now;
+    introTexts.incoming.setAlpha(0).setVisible(true);
+    introTexts.invaders.setVisible(false).setScale(1).setAlpha(1);
+    introTexts.ready.setVisible(false).setAlpha(1);
+    delete introTexts._shakeStart;
+    // 外星人回到天頂
+    introAliens.forEach((alien, i) => {
+      alien.y = -60 - i * 30;
+      alien.alpha = 1;
+    });
+  }
+}
+
 function update() {
+  // 片頭動畫
+  if (gamePhase === 'intro') {
+    runIntro(this);
+    return;
+  }
+
   // 星空持續滾動（即使 gameOver 也動）
   if (starfield) starfield.tilePositionY -= 0.4;
 
@@ -742,6 +848,7 @@ function restartGame() {
   // Reset 所有遊戲狀態
   gameOver = false;
   gameReady = false;
+  gamePhase = 'playing';
   score = 0;
   wave = 1;
   lives = 3;
@@ -792,6 +899,11 @@ function restartGame() {
 window.addEventListener('keydown', e => {
   SoundManager.init();
   SoundManager.resume();
+  // 片頭期間按空白鍵開始遊戲
+  if (gamePhase === 'intro' && (e.key === ' ' || e.code === 'Space')) {
+    skipIntro();
+    return;
+  }
   if (gameOver && e.key === ' ') {
     restartGame();
   }
@@ -812,7 +924,8 @@ function setupTouchControls() {
     const press = e => {
       e.preventDefault();
       unlockAudio();
-      if (gameOver) restartGame(); // GAME OVER 時 FIRE 也能重開
+      if (gamePhase === 'intro') skipIntro();
+      else if (gameOver) restartGame(); // GAME OVER 時 FIRE 也能重開
       else touchState.fire = true;
     };
     const release = e => { e.preventDefault(); touchState.fire = false; };
@@ -826,7 +939,8 @@ function setupTouchControls() {
     coinBtn.addEventListener('pointerdown', e => {
       e.preventDefault();
       unlockAudio();
-      if (gameOver) restartGame();
+      if (gamePhase === 'intro') skipIntro();
+      else if (gameOver) restartGame();
     });
   }
 
