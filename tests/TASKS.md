@@ -1,32 +1,33 @@
-### Task: 片頭循環播放 [R]
+### Task: Game Over 20 秒無動作 → 進 demo [R]
 **Acceptance Criteria:**
-- Given 遊戲剛載入
-- When 5.5 秒後
-- Then gamePhase 仍是 'intro'
-- And introAliens 長度仍為 8
-- And introStartTime 被重設（回到接近 scene.time.now）
+- Given gamePhase 為 'gameover' 且已過 20 秒無按鍵
+- When update() 執行
+- Then gamePhase 變為 'demo'
+- And demo 畫面顯示排行榜
 
-### Task: 空白鍵跳過片頭進倒數
+### Task: Game Over 期間有按鍵 → 重設 idle timer [R]
 **Acceptance Criteria:**
-- Given gamePhase 為 'intro'
-- When skipIntro() 被呼叫
-- Then gamePhase 變為 'countdown'
-- And countdownTexts.ready 存在
-- And countdownTexts.go 存在
-- And introAliens 被清空
-- And introTexts 被清空
+- Given gamePhase 為 'gameover'，idle 了 15 秒
+- When 使用者按空白鍵
+- Then idle timer 被重設為 0
+- And 觸發 restartGame()
 
-### Task: 倒數 READY? → GO! → 遊戲開始 [R]
+### Task: 排行榜存 localStorage [R]
 **Acceptance Criteria:**
-- Given gamePhase 為 'countdown'，countdownStart 為 2.5 秒前
-- When runCountdown() 被呼叫
-- Then gamePhase 變為 'playing'
-- And player 存在
-- And invaders 群組有活躍敵人
-- And countdownTexts 被清空
+- Given 本次 score=5000，localStorage 已有分數 [1000, 800, 300]
+- When saveHighScore() 被呼叫
+- Then 排行榜前 10 名包含 5000 且排序正確
 
-### Task: 遊戲中按空白鍵不會觸發倒數
+### Task: Demo 畫面顯示排行榜
 **Acceptance Criteria:**
-- Given gamePhase 為 'playing'
-- When 空白鍵被按下
-- Then gamePhase 仍為 'playing'（不進 countdown）
+- Given 排行榜有 5 筆分數
+- When demo 畫面顯示
+- Then 畫面出現 "HIGH SCORES" 標題
+- And 顯示排名 1~5 的分數
+
+### Task: Demo 期間按鍵 → 回 intro
+**Acceptance Criteria:**
+- Given gamePhase 為 'demo'
+- When 按任意鍵
+- Then gamePhase 變為 'intro'
+- And demo 文字被清除

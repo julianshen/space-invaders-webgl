@@ -4,10 +4,10 @@ Generated: 2026-06-17
 
 | Metric     | Value |
 |------------|-------|
-| Total      | 21    |
-| Passed     | 21    |
+| Total      | 25    |
+| Passed     | 25    |
 | Failed     | 0     |
-| Regression | 8/8 ✅ |
+| Regression | 11/11 ✅ |
 
 ## Pure Logic Tests (6/6)
 
@@ -49,6 +49,15 @@ Generated: 2026-06-17
 | 19 | intro loops after 5.5s | ✅ PASS |
 | 20 | skipIntro → countdown phase | ✅ PASS |
 | 21 | countdown ends → game starts | ✅ PASS |
+
+##### Demo & Leaderboard (BDD) — 4/4
+
+| # | Test | Status |
+|---|------|--------|
+| 22 | leaderboard save/sort (top 10, localStorage) | ✅ PASS |
+| 23 | enterDemo creates HIGH SCORES UI | ✅ PASS |
+| 24 | demo keypress → back to intro | ✅ PASS |
+| 25 | gameOver idle timer < 20s | ✅ PASS |
 
 ## Coverage Notes
 

@@ -289,6 +289,28 @@ let introTexts = {};
 let countdownStart = 0;
 let countdownTexts = {};
 
+// === Demo / 排行榜 ===
+let gameOverIdleStart = 0;
+let demoTexts = {};
+const LEADERBOARD_KEY = 'spaceInvadersLeaderboard';
+const LEADERBOARD_SIZE = 10;
+
+function getLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function saveScoreToLeaderboard(finalScore) {
+  if (!finalScore || finalScore <= 0) return;
+  const board = getLeaderboard();
+  board.push(finalScore);
+  board.sort((a, b) => b - a);
+  const top10 = board.slice(0, LEADERBOARD_SIZE);
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top10));
+}
+
 function preload() {
   // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
   this.load.image('spaceship', 'spaceship.png');
@@ -531,6 +553,37 @@ function updateScoreText() {
   scoreText.setText(buildScoreText());
 }
 
+// 重建片頭（從 demo 回來時用）
+function rebuildIntro() {
+  const scene = game.scene.scenes[0];
+  introAliens.forEach(a => { if (a && a.destroy) a.destroy(); });
+  Object.values(introTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
+  introAliens = [];
+  introTexts = {};
+
+  introTexts.incoming = scene.add.text(400, 180, 'INCOMING\nTRANSMISSION...', {
+    fontFamily: 'monospace', fontSize: '28px', color: '#ffdd00',
+    align: 'center', fontStyle: 'bold'
+  }).setOrigin(0.5).setAlpha(0).setDepth(200);
+
+  introTexts.invaders = scene.add.text(400, 200, 'INVADERS!', {
+    fontFamily: 'monospace', fontSize: '72px', color: '#ff0000', fontStyle: 'bold'
+  }).setOrigin(0.5).setVisible(false).setDepth(200);
+
+  introTexts.ready = scene.add.text(400, 330, 'GET READY', {
+    fontFamily: 'monospace', fontSize: '32px', color: '#00ff00'
+  }).setOrigin(0.5).setVisible(false).setDepth(200);
+
+  for (let i = 0; i < 8; i++) {
+    const alien = scene.add.sprite(
+      200 + (i % 4) * 140 + (Math.floor(i / 4) * 60), -60 - i * 30, 'invader'
+    );
+    alien.setDisplaySize(42, 24);
+    alien.setDepth(150);
+    introAliens.push(alien);
+  }
+}
+
 // 跳過片頭（按鍵或觸控觸發）
 function skipIntro() {
   if (gamePhase !== 'intro') return;
@@ -642,10 +695,78 @@ function runCountdown(scene) {
   }
 }
 
+// Demo 模式：顯示排行榜
+function enterDemo() {
+  gamePhase = 'demo';
+  // 清除所有現有 UI 文字
+  [gameOverText, finalScoreText, restartText, scoreText].forEach(t => { if (t) t.setVisible(false); });
+  // 清除可能殘留的 intro / countdown 文字
+  Object.values(introTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
+  Object.values(countdownTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
+  introAliens.forEach(a => { if (a && a.destroy) a.destroy(); });
+  introAliens = []; introTexts = {}; countdownTexts = {};
+
+  const scene = game.scene.scenes[0];
+  const board = getLeaderboard();
+
+  // 標題
+  demoTexts.title = scene.add.text(400, 120, '★ HIGH SCORES ★', {
+    fontFamily: 'monospace', fontSize: '36px', color: '#ffdd00', fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(300).setAlpha(0);
+
+  // 排行榜條目
+  demoTexts.entries = [];
+  const top5 = board.slice(0, 5);
+  if (top5.length === 0) {
+    demoTexts.entries.push(
+      scene.add.text(400, 260, 'NO SCORES YET', {
+        fontFamily: 'monospace', fontSize: '22px', color: '#888888'
+      }).setOrigin(0.5).setDepth(300)
+    );
+  } else {
+    top5.forEach((s, i) => {
+      const rank = (i + 1).toString();
+      const medals = ['🥇', '🥈', '🥉', '  ', '  '];
+      const y = 190 + i * 50;
+      const txt = scene.add.text(400, y,
+        `${medals[i]}  ${rank}st${rank==='1'?'':rank==='2'?'nd':rank==='3'?'rd':'th'}  ·  ${s.toString().padStart(6, '0')}`,
+        { fontFamily: 'monospace', fontSize: '24px', color: i === 0 ? '#ffff00' : '#cccccc' }
+      ).setOrigin(0.5).setDepth(300);
+      demoTexts.entries.push(txt);
+    });
+  }
+
+  // 提示文字
+  demoTexts.hint = scene.add.text(400, 500, 'PRESS ANY KEY TO START', {
+    fontFamily: 'monospace', fontSize: '18px', color: '#888888'
+  }).setOrigin(0.5).setDepth(300);
+}
+
+function runDemo(scene) {
+  // 星空慢速滾動
+  if (starfield) starfield.tilePositionY -= 0.2;
+
+  // 標題淡入
+  const elapsed = scene.time.now - gameOverIdleStart - 20000;
+  if (demoTexts.title && demoTexts.title.alpha < 1) {
+    demoTexts.title.setAlpha(Math.min(1, demoTexts.title.alpha + 0.02));
+  }
+  // 提示文字閃爍
+  if (demoTexts.hint) {
+    demoTexts.hint.setAlpha(0.4 + Math.sin(elapsed * 0.005) * 0.3);
+  }
+}
+
 function update() {
   // 片頭動畫
   if (gamePhase === 'intro') {
     runIntro(this);
+    return;
+  }
+
+  // Demo 模式
+  if (gamePhase === 'demo') {
+    runDemo(this);
     return;
   }
 
@@ -659,6 +780,14 @@ function update() {
   if (starfield) starfield.tilePositionY -= 0.4;
 
   try {
+  // Game Over idle → demo 轉場
+  if (gameOver && gamePhase === 'playing') {
+    if (this.time.now - gameOverIdleStart > 20000) {
+      enterDemo.call(this);
+    }
+    return;
+  }
+
   if (gameOver || !player || (!playerDead && !player.body) || !gameReady) return;
 
   // 死亡時不能操控
@@ -738,8 +867,10 @@ function update() {
     drawLives.call(this);
     if (lives <= 0) {
       gameOver = true;
-      // === SAVE HIGH SCORE ===
+      gameOverIdleStart = this.time.now;
+      // === SAVE SCORES ===
       saveHighScore();
+      saveScoreToLeaderboard(score);
       freezeField(); // 停下所有敵人 / 子彈，避免在 GAME OVER 畫面繼續飄移
       scoreText.setVisible(false);
       gameOverText.setText('GAME OVER');
@@ -834,9 +965,11 @@ function hitPlayer(enemyBullet, playerSprite) {
   if (lives <= 0) {
     // 完全死亡 → Game Over
     gameOver = true;
+    gameOverIdleStart = this.time.now;
     SoundManager.play('gameOver');
-    // === SAVE HIGH SCORE ===
+    // === SAVE SCORES ===
     saveHighScore();
+    saveScoreToLeaderboard(score);
     freezeField(); // 停下所有敵人 / 子彈，避免在 GAME OVER 畫面繼續飄移
     scoreText.setVisible(false);
     gameOverText.setText('GAME OVER');
@@ -897,6 +1030,7 @@ function restartGame() {
   gameOver = false;
   gameReady = false;
   gamePhase = 'playing';
+  gameOverIdleStart = 0;
   score = 0;
   wave = 1;
   lives = 3;
@@ -947,12 +1081,30 @@ function restartGame() {
 window.addEventListener('keydown', e => {
   SoundManager.init();
   SoundManager.resume();
+
+  // Demo 期間按任意鍵 → 回 intro
+  if (gamePhase === 'demo') {
+    Object.values(demoTexts).forEach(t => {
+      if (Array.isArray(t)) t.forEach(x => x.destroy());
+      else t.destroy();
+    });
+    demoTexts = {};
+    gamePhase = 'intro';
+    introStartTime = game.scene.scenes[0].time.now;
+    // 重建 intro
+    rebuildIntro();
+    return;
+  }
+
   // 片頭期間按空白鍵開始遊戲
   if (gamePhase === 'intro' && (e.key === ' ' || e.code === 'Space')) {
     skipIntro();
     return;
   }
+
+  // Game over 期間按空白鍵重設 idle timer + 重來
   if (gameOver && e.key === ' ') {
+    gameOverIdleStart = 0;
     restartGame();
   }
 }, { capture: true });
