@@ -208,6 +208,88 @@ const SoundManager = {
     }
   },
 
+  // === 8-bit 開場旋律 ===
+  // 星際大戰風，簡單有記憶點
+  fanfare() {
+    const ctx = SoundManager.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const bpm = 100;
+    const beat = 60 / bpm; // 0.6s per beat
+    const vol = 0.18;
+
+    // 旋律序列：[頻率(Hz), 開始拍, 持續拍]
+    const melody = [
+      // Bar 1: 英雄式開場
+      [523.25, 0, 1.0],     // C5 (quarter +)
+      [0, 1.0, 0.5],         // 休止
+      [783.99, 1.5, 0.5],    // G5 (eighth)
+      [1046.5, 2.0, 2.0],    // C6 (half, 拉長)
+      // Bar 2: 回穩
+      [987.77, 4, 1.0],      // B5
+      [1046.5, 5, 1.0],      // C6
+      [783.99, 6, 2.0],      // G5
+      // Bar 3: 轉折
+      [880.00, 8, 1.0],      // A5
+      [783.99, 9, 1.0],      // G5
+      [698.46, 10, 2.0],     // F5
+      // Bar 4: 回家 + 尾音
+      [659.25, 12, 1.0],     // E5
+      [523.25, 13, 1.0],     // C5
+      [523.25, 14, 3.0],     // C5 (長音結尾)
+    ];
+
+    melody.forEach(([freq, startBeat, durBeat]) => {
+      if (freq === 0) return; // rest
+      const startTime = t + startBeat * beat;
+      const duration = durBeat * beat;
+
+      // Lead: 方波，經典 8-bit 聲
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      // 簡單的 envelope
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.02); // 快速 attack
+      gain.gain.setValueAtTime(vol, startTime + duration * 0.8); // sustain
+      gain.gain.linearRampToValueAtTime(0, startTime + duration); // release
+
+      // 輕微低通濾波，讓方波不那麼刺
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 3000;
+      filter.Q.value = 0.5;
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(SoundManager.masterGain);
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.05);
+    });
+
+    // Bass: 簡單的根音襯底
+    const bassNotes = [
+      [130.81, 0, 4],   // C3
+      [130.81, 4, 4],   // C3
+      [174.61, 8, 4],   // F3
+      [130.81, 12, 4],  // C3
+    ];
+    bassNotes.forEach(([freq, startBeat, durBeat]) => {
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(freq, t + startBeat * beat);
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(vol * 0.4, t + startBeat * beat);
+      g2.gain.linearRampToValueAtTime(0, t + (startBeat + durBeat) * beat);
+      osc2.connect(g2);
+      g2.connect(SoundManager.masterGain);
+      osc2.start(t + startBeat * beat);
+      osc2.stop(t + (startBeat + durBeat) * beat + 0.05);
+    });
+  },
+
   play(name) {
     this.init();
     this.resume();
@@ -625,6 +707,7 @@ function runIntro(scene) {
     // Build crawl lines on first frame
     if (crawlLines.length === 0) {
       introTexts.logo.setVisible(false);
+      SoundManager.play('fanfare'); // 8-bit 開場旋律
       const crawlText = [
         'EPISODE IV',
         '',
