@@ -209,7 +209,7 @@
     introTexts.blueText = scene.add.text(400,300,'TEST',{fontFamily:'monospace',fontSize:'22px',color:'#4a9eff'}).setOrigin(0.5).setAlpha(0).setDepth(200);
     introTexts.logo = scene.add.text(400,280,'TEST',{fontFamily:'monospace',fontSize:'56px',color:'#ffd700'}).setOrigin(0.5).setVisible(false).setDepth(200);
     crawlLines = [];
-    introStartTime = scene.time.now - 17000; // past full 16s cycle
+    introStartTime = scene.time.now - 21000; // past full 20s cycle (6+14)
     runIntro(scene);
     eq(gamePhase, 'intro', 'still intro after loop');
     assert(scene.time.now - introStartTime < 1000, 'introStartTime reset');

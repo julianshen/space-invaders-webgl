@@ -659,15 +659,15 @@ function runIntro(scene) {
           fontSize: '16px',
           color: '#ffd700',
           align: 'center',
-          fontStyle: line.startsWith('EPISODE') || line === 'A NEW HOPE' ? 'bold' : 'normal'
+          fontStyle: line.startsWith('EPISODE') || line === 'A NEW HOPE' ? 'bold' : 'italic'
         }).setOrigin(0.5).setDepth(200);
         crawlLines.push(txt);
       });
     }
 
     const pt = t - 6.0;
-    const crawlSpeed = 120; // pixels per second
-    const crawlDuration = 10; // seconds
+    const crawlSpeed = 80; // pixels per second (slower, more dramatic)
+    const crawlDuration = 14; // seconds (slower speed needs more time)
 
     crawlLines.forEach((txt, i) => {
       const baseY = 700 + i * 32;
