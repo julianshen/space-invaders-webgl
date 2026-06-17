@@ -197,6 +197,56 @@
   });
 
   // =====================
+  // Intro & Countdown (BDD)
+  // =====================
+  run('intro loops after 5.5s', () => {
+    gamePhase = 'intro'; introStartTime = scene.time.now;
+    introAliens = []; introTexts = {};
+    introTexts.incoming = scene.add.text(400,180,'TEST',{fontFamily:'monospace',fontSize:'28px',color:'#ffdd00'}).setOrigin(0.5).setAlpha(0).setDepth(200);
+    introTexts.invaders = scene.add.text(400,200,'TEST',{fontFamily:'monospace',fontSize:'72px',color:'#ff0000'}).setOrigin(0.5).setVisible(false).setDepth(200);
+    introTexts.ready = scene.add.text(400,330,'TEST',{fontFamily:'monospace',fontSize:'32px',color:'#00ff00'}).setOrigin(0.5).setVisible(false).setDepth(200);
+    for (let i = 0; i < 8; i++) {
+      const a = scene.add.sprite(200 + i * 70, -60 - i * 30, 'invader');
+      a.setDisplaySize(42, 24); a.setDepth(150); introAliens.push(a);
+    }
+    introStartTime = scene.time.now - 6000;
+    const beforeTime = introStartTime;
+    runIntro(scene);
+    eq(gamePhase, 'intro', 'still intro after loop');
+    assert(scene.time.now - introStartTime < 1000, 'introStartTime reset');
+    introAliens.forEach(a => a.destroy());
+    Object.values(introTexts).forEach(t => t.destroy());
+    introAliens = []; introTexts = {};
+  });
+
+  run('skipIntro → countdown phase', () => {
+    gamePhase = 'intro';
+    introAliens = [scene.add.sprite(400, -50, 'invader')];
+    introTexts = { t: scene.add.text(400, 100, 'x', {}) };
+    skipIntro();
+    eq(gamePhase, 'countdown', 'entered countdown');
+    assert(countdownTexts.ready !== undefined, 'ready text created');
+    assert(countdownTexts.go !== undefined, 'go text created');
+    eq(introAliens.length, 0, 'introAliens cleared');
+    countdownTexts.ready.destroy();
+    countdownTexts.go.destroy();
+    countdownTexts = {};
+  });
+
+  run('countdown ends → game starts', () => {
+    gamePhase = 'countdown'; countdownStart = scene.time.now - 2500;
+    countdownTexts = {
+      ready: scene.add.text(400, 250, 'READY?', {}),
+      go: scene.add.text(400, 250, 'GO!', {})
+    };
+    runCountdown(scene);
+    eq(gamePhase, 'playing', 'transitioned to playing');
+    assert(!!player, 'player created');
+    assert(invaders.countActive() > 0, 'invaders exist');
+    eq(Object.keys(countdownTexts).length, 0, 'countdownTexts cleaned');
+  });
+
+  // =====================
   // Report
   // =====================
   console.log(JSON.stringify({results, pass, fail, total: pass+fail}, null, 2));

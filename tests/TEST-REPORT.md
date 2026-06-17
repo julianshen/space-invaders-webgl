@@ -4,10 +4,10 @@ Generated: 2026-06-17
 
 | Metric     | Value |
 |------------|-------|
-| Total      | 18    |
-| Passed     | 18    |
+| Total      | 21    |
+| Passed     | 21    |
 | Failed     | 0     |
-| Regression | 5/5 ✅ |
+| Regression | 8/8 ✅ |
 
 ## Pure Logic Tests (6/6)
 
@@ -41,6 +41,14 @@ Generated: 2026-06-17
 | 16 | reg: restartGame clears stale events | ✅ PASS |
 | 17 | reg: freezeField all groups stopped | ✅ PASS |
 | 18 | reg: object pool size ≤ maxSize | ✅ PASS |
+
+## Intro & Countdown (BDD) — 3/3
+
+| # | Test | Status |
+|---|------|--------|
+| 19 | intro loops after 5.5s | ✅ PASS |
+| 20 | skipIntro → countdown phase | ✅ PASS |
+| 21 | countdown ends → game starts | ✅ PASS |
 
 ## Coverage Notes
 
