@@ -1235,7 +1235,9 @@ function update() {
     // Check UFO bounds (destroy if off-screen) and bullet collision
     if (ufoActive && ufo) {
       checkUFOBounds();
-      this.physics.overlap(bullets, ufo, hitUFO, null, this);
+      if (ufoActive && ufo) {
+        this.physics.overlap(bullets, ufo, hitUFO, null, this);
+      }
     }
   }
 } catch(e) { console.warn('update err:', e); }  // 讓 update 內的錯誤可見，方便除錯
