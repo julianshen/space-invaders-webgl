@@ -446,6 +446,11 @@ let demoTexts = {};
 const LEADERBOARD_KEY = 'spaceInvadersLeaderboard';
 const LEADERBOARD_SIZE = 10;
 
+// === UFO / Mystery Ship ===
+let ufo = null;
+let ufoActive = false;
+let ufoNextSpawn = 0;
+
 function getLeaderboard() {
   try {
     const raw = localStorage.getItem(LEADERBOARD_KEY);
@@ -547,6 +552,17 @@ function create() {
   introStartTime = this.time.now;
   introIdleStart = this.time.now;
 
+  // === UFO Texture (程序生成，經典紅色飛碟) ===
+  const ufoGfx = this.textures.createCanvas('ufo', 48, 20);
+  const uctx = ufoGfx.getContext();
+  uctx.fillStyle = '#ff4444';
+  uctx.fillRect(4, 2, 40, 16);
+  uctx.fillStyle = '#ffffff';
+  uctx.fillRect(8, 4, 8, 12);
+  uctx.fillRect(20, 4, 8, 12);
+  uctx.fillRect(32, 4, 8, 12);
+  ufoGfx.refresh();
+
   // Phase 1: Blue intro text
   introTexts.blueText = this.add.text(400, 300,
     'A long time ago in a galaxy\nfar, far away....', {
@@ -608,6 +624,62 @@ function startPlaying() {
   drawLives.call(this);
   gameReady = true;
   gamePhase = 'playing';
+
+  // Initialize UFO spawn timer
+  ufoNextSpawn = this.time.now + getUFOSpawnInterval();
+}
+
+// === UFO / Mystery Ship ===
+function getUFOSpawnInterval() {
+  // Random interval between 15-30 seconds
+  return 15000 + Math.floor(Math.random() * 15000);
+}
+
+function spawnUFO(scene) {
+  if (ufo) { ufo.destroy(); ufo = null; }
+  // Random direction: left-to-right or right-to-left
+  const fromLeft = Math.random() > 0.5;
+  const startX = fromLeft ? -50 : 850;
+  const dir = fromLeft ? 1 : -1;
+  ufo = scene.physics.add.sprite(startX, 50, 'ufo');
+  ufo.setVelocityX(120 * dir);
+  ufo.setDepth(50);
+  ufoActive = true;
+  // UFO flying sound
+  SoundManager.play('shoot'); // Reuse shoot sound for now
+}
+
+function hitUFO(bullet, ufoSprite) {
+  if (gameOver) return;
+  bullet.disableBody(true, true);
+  const bonusValues = [50, 100, 150, 200];
+  const bonus = Phaser.Math.RND.pick(bonusValues);
+  score += bonus;
+  updateScoreText();
+  // Explosion effect
+  const scene = game.scene.scenes[0];
+  const exp = explosions.create(ufoSprite.x, ufoSprite.y, 'explode_sheet', 0);
+  exp.setDisplaySize(56, 40);
+  exp.play('explode_pro');
+  exp.once('animationcomplete', () => exp.destroy());
+  SoundManager.play('explosion');
+  ufoSprite.destroy();
+  ufo = null;
+  ufoActive = false;
+  // Schedule next UFO spawn
+  ufoNextSpawn = scene.time.now + getUFOSpawnInterval();
+}
+
+function checkUFOBounds() {
+  if (!ufo || !ufoActive) return;
+  if (ufo.x > 850 || ufo.x < -50) {
+    ufo.destroy();
+    ufo = null;
+    ufoActive = false;
+    // Schedule next UFO spawn
+    const scene = game.scene.scenes[0];
+    ufoNextSpawn = scene.time.now + getUFOSpawnInterval();
+  }
 }
 
 function createWave(waveNum) {
@@ -1153,6 +1225,19 @@ function update() {
   enemyBullets.getChildren().slice().forEach(b => {
     if (b && b.active && b.y > 600) b.disableBody(true, true);
   });
+
+  // === UFO / Mystery Ship ===
+  if (gameReady && !gameOver && !playerDead) {
+    // Spawn UFO on timer
+    if (!ufoActive && this.time.now >= ufoNextSpawn) {
+      spawnUFO(this);
+    }
+    // Check UFO bounds (destroy if off-screen) and bullet collision
+    if (ufoActive && ufo) {
+      checkUFOBounds();
+      this.physics.overlap(bullets, ufo, hitUFO, null, this);
+    }
+  }
 } catch(e) { console.warn('update err:', e); }  // 讓 update 內的錯誤可見，方便除錯
 }
 
@@ -1210,6 +1295,8 @@ function freezeField() {
   });
   // 玩家船在「敵人到底」結束時仍可見，若還有殘留速度會繼續滑出畫面
   if (player && player.body) player.setVelocity(0, 0);
+  // UFO 也要停下
+  if (ufo && ufo.body) ufo.setVelocity(0, 0);
 }
 
 // === HIGH SCORE: save to localStorage if current score is higher ===
@@ -1284,6 +1371,11 @@ function restartGame() {
   createWave.call(scene, 1);
   drawLives.call(scene);
   gameReady = true;
+
+  // Reset UFO
+  if (ufo) { ufo.destroy(); ufo = null; }
+  ufoActive = false;
+  ufoNextSpawn = scene.time.now + getUFOSpawnInterval();
 }
 
 // 第一次點擊/觸碰就解鎖 audio（繞過 autoplay policy）+ reset intro idle
