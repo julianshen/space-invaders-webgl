@@ -489,6 +489,81 @@
   });
 
   // =====================
+  // UFO / Mystery Ship (TDD)
+  // =====================
+  run('UFO: spawns at top of screen with ufo texture', () => {
+    // Clean up any previous UFO
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    assert(ufo !== null && ufo !== undefined, 'ufo sprite created');
+    assert(ufo.texture && ufo.texture.key === 'ufo', 'ufo texture key is ufo');
+    assert(ufo.y < 100, 'ufo near top of screen: ' + ufo.y);
+    assert(ufoActive === true, 'ufoActive is true');
+    // Cleanup
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO: moves horizontally after spawning', () => {
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    assert(ufo !== null, 'ufo exists');
+    assert(ufo.body && ufo.body.velocity.x !== 0,
+      'ufo has horizontal velocity: ' + (ufo.body ? ufo.body.velocity.x : 'no body'));
+    // Cleanup
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO: destroyed when past screen bounds', () => {
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    assert(ufo !== null, 'ufo spawned');
+    // Simulate UFO going past right edge
+    ufo.x = 900;
+    checkUFOBounds();
+    assert(ufoActive === false || !ufo || !ufo.active,
+      'ufo deactivated after bounds check (x=900)');
+    // Cleanup
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO: hitUFO adds random bonus 50/100/150/200', () => {
+    // Ensure game state is ready
+    if (!bullets || !bullets.clear) {
+      startPlaying.call(scene);
+    }
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    const beforeScore = score;
+    // Create a bullet and call hitUFO
+    const bullet = bullets.get(ufo.x, ufo.y, 'bullet');
+    if (bullet) {
+      bullet.enableBody(true, ufo.x, ufo.y, true, true);
+      hitUFO(bullet, ufo);
+      const bonus = score - beforeScore;
+      assert([50, 100, 150, 200].includes(bonus),
+        'bonus score in [50,100,150,200]: got ' + bonus);
+    } else {
+      assert(false, 'could not get bullet from pool');
+    }
+    // Cleanup
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO: spawn timer interval is 15-30 seconds', () => {
+    const interval = getUFOSpawnInterval();
+    assert(interval >= 15000 && interval <= 30000,
+      'spawn interval between 15000-30000ms: got ' + interval);
+  });
+
+  // =====================
   // Report
   // =====================
   console.log(JSON.stringify({results, pass, fail, total: pass+fail}, null, 2));
