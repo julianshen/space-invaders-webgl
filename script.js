@@ -227,6 +227,30 @@ const SoundManager = {
         osc.start(t);
         osc.stop(t + 0.25);
       });
+    },
+
+    // === 幽浮飛行音效 — 經典顫音 ===
+    ufo() {
+      const ctx = SoundManager.ctx;
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      // Warbling oscillator: frequency oscillates between two tones
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.linearRampToValueAtTime(600, now + 0.15);
+      osc.frequency.linearRampToValueAtTime(200, now + 0.3);
+      osc.frequency.linearRampToValueAtTime(600, now + 0.45);
+      osc.frequency.linearRampToValueAtTime(200, now + 0.6);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+      osc.connect(gain);
+      gain.connect(SoundManager.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.75);
     }
   },
 
@@ -646,7 +670,7 @@ function spawnUFO(scene) {
   ufo.setDepth(50);
   ufoActive = true;
   // UFO flying sound
-  SoundManager.play('shoot'); // Reuse shoot sound for now
+  SoundManager.play('ufo');
 }
 
 function hitUFO(bullet, ufoSprite) {
