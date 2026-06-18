@@ -896,7 +896,11 @@ function enterDemo() {
   crawlLines.forEach(t => { if (t && t.destroy) t.destroy(); });
   crawlLines = []; introTexts = {}; countdownTexts = {};
 
+  // 保險：清掉 scene 裡所有殘留文字（避免 crawlLines 被清空後文字變孤兒）
   const scene = game.scene.scenes[0];
+  scene.children.list.filter(c => c.type === 'Text').forEach(t => {
+    if (t && t.destroy) t.destroy();
+  });
   const board = getLeaderboard();
 
   // 標題
