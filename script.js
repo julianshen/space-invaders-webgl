@@ -474,6 +474,8 @@ const LEADERBOARD_SIZE = 10;
 let ufo = null;
 let ufoActive = false;
 let ufoNextSpawn = 0;
+let ufoPhase = 'normal';
+let ufoPhaseStart = 0;
 
 function getLeaderboard() {
   try {
@@ -576,15 +578,51 @@ function create() {
   introStartTime = this.time.now;
   introIdleStart = this.time.now;
 
-  // === UFO Texture (程序生成，經典紅色飛碟) ===
-  const ufoGfx = this.textures.createCanvas('ufo', 48, 20);
+  // === UFO Texture (米白 + 淡橘，復古飛碟 + 陰影 + 裝飾線 + 橢圓形) ===
+  const ufoGfx = this.textures.createCanvas('ufo', 52, 22);
   const uctx = ufoGfx.getContext();
-  uctx.fillStyle = '#ff4444';
-  uctx.fillRect(4, 2, 40, 16);
-  uctx.fillStyle = '#ffffff';
-  uctx.fillRect(8, 4, 8, 12);
-  uctx.fillRect(20, 4, 8, 12);
-  uctx.fillRect(32, 4, 8, 12);
+
+  // Subtle blurred shadow on edges (aged/retro feel, avoid clean look)
+  uctx.shadowColor = 'rgba(0,0,0,0.45)';
+  uctx.shadowBlur = 5;
+  uctx.shadowOffsetX = 2;
+  uctx.shadowOffsetY = 2;
+
+  // Main saucer body - slightly elliptical, aged off-white (米白)
+  uctx.fillStyle = '#EDE4D3';
+  uctx.beginPath();
+  uctx.ellipse(26, 13, 23, 8, 0, 0, Math.PI * 2);
+  uctx.fill();
+
+  // Clear shadow for inner details to avoid muddy look
+  uctx.shadowBlur = 0;
+  uctx.shadowOffsetX = 0;
+  uctx.shadowOffsetY = 0;
+
+  // Top dome - soft orange (淡橘)
+  uctx.fillStyle = '#F5C48A';
+  uctx.beginPath();
+  uctx.ellipse(26, 9, 14, 6, 0, 0, Math.PI * 2);
+  uctx.fill();
+
+  // Two very thin decorative lines on top (retro accent)
+  uctx.strokeStyle = '#C9A87A';
+  uctx.lineWidth = 1;
+  uctx.beginPath();
+  uctx.moveTo(14, 5);
+  uctx.lineTo(38, 5);
+  uctx.stroke();
+  uctx.beginPath();
+  uctx.moveTo(16, 7);
+  uctx.lineTo(36, 7);
+  uctx.stroke();
+
+  // Subtle panel lines / windows for retro detail (faded)
+  uctx.fillStyle = '#D4C4A8';
+  uctx.fillRect(15, 11, 5, 3);
+  uctx.fillRect(23, 11, 6, 3);
+  uctx.fillRect(32, 11, 5, 3);
+
   ufoGfx.refresh();
 
   // Phase 1: Blue intro text
@@ -676,8 +714,17 @@ function spawnUFO(scene) {
 function hitUFO(bullet, ufoSprite) {
   if (gameOver) return;
   bullet.disableBody(true, true);
-  const bonusValues = [50, 100, 150, 200];
-  const bonus = Phaser.Math.RND.pick(bonusValues);
+  let bonus;
+  if (ufoPhase === 'green') {
+    // GREEN phase: higher bonus (150 or 200)
+    bonus = Phaser.Math.RND.pick([150, 200]);
+  } else if (ufoPhase === 'red') {
+    // RED phase: medium bonus (100 or 150)
+    bonus = Phaser.Math.RND.pick([100, 150]);
+  } else {
+    // normal phase: standard bonus
+    bonus = Phaser.Math.RND.pick([50, 100, 150, 200]);
+  }
   score += bonus;
   updateScoreText();
   // Explosion effect
@@ -1261,6 +1308,43 @@ function update() {
       checkUFOBounds();
       if (ufoActive && ufo) {
         this.physics.overlap(bullets, ufo, hitUFO, null, this);
+      }
+      // Slight wobble/sway instead of perfectly straight horizontal flight (retro feel)
+      if (ufo && ufoActive) {
+        const sway = Math.sin(this.time.now * 0.004) * 2.8;
+        ufo.y = 50 + sway;
+      }
+      // === UFO Phase System (Rei's Design — RED/GREEN) ===
+      if (ufo && ufoActive) {
+        const phaseElapsed = this.time.now - ufoPhaseStart;
+        // Phase 1: RED (aggressive, fast, shoots) — 4-8 seconds
+        if (phaseElapsed > 4000 && phaseElapsed <= 8000 && ufoPhase !== 'red') {
+          ufoPhase = 'red';
+          ufo.setTint(0xFF4444);
+          // Speed up 1.5x (keep direction)
+          const currentSpeed = Math.abs(ufo.body.velocity.x);
+          const dir = ufo.body.velocity.x >= 0 ? 1 : -1;
+          ufo.setVelocityX(currentSpeed * 1.5 * dir);
+        }
+        // Phase 2: GREEN (slow, high bonus) — after 8 seconds
+        else if (phaseElapsed > 8000 && ufoPhase !== 'green') {
+          ufoPhase = 'green';
+          ufo.setTint(0x44FF44);
+          // Slow down to 0.7x (keep direction)
+          const currentSpeed = Math.abs(ufo.body.velocity.x);
+          const dir = ufo.body.velocity.x >= 0 ? 1 : -1;
+          ufo.setVelocityX(currentSpeed * 0.7 * dir);
+        }
+        // RED phase: occasional downward shot (20% chance per 500ms check)
+        if (ufoPhase === 'red' && phaseElapsed % 500 < 20) {
+          if (Math.random() < 0.2) {
+            const eb = enemyBullets.get(ufo.x, ufo.y + 10, 'ebullet');
+            if (eb) {
+              eb.enableBody(true, ufo.x, ufo.y + 10, true, true);
+              eb.setVelocityY(200 + wave * 10);
+            }
+          }
+        }
       }
     }
   }

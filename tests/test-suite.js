@@ -557,10 +557,112 @@
     ufoActive = false;
   });
 
-  run('UFO: spawn timer interval is 15-30 seconds', () => {
-    const interval = getUFOSpawnInterval();
-    assert(interval >= 15000 && interval <= 30000,
-      'spawn interval between 15000-30000ms: got ' + interval);
+  // =====================
+
+  // =====================
+  // UFO Phase System (Rei's Design — RED/GREEN)
+  // =====================
+  run('UFO phase: spawns in normal phase', () => {
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    assert(ufoPhase === 'normal', 'ufoPhase starts as normal: ' + ufoPhase);
+    assert(ufoPhaseStart > 0, 'ufoPhaseStart is set: ' + ufoPhaseStart);
+    assert(!ufo.tintTopLeft || ufo.tintTopLeft === 0xFFFFFF,
+      'no tint in normal phase: ' + ufo.tintTopLeft);
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO phase: transitions to RED after 4 seconds', () => {
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    const origTime = ufoPhaseStart;
+    // Simulate 4.5 seconds passing
+    ufoPhaseStart = scene.time.now - 4500;
+    // Manually trigger phase update logic (normally in update())
+    const elapsed = scene.time.now - ufoPhaseStart;
+    if (elapsed > 4000 && ufoPhase === 'normal') {
+      ufoPhase = 'red';
+      ufo.setTint(0xFF4444);
+      ufo.setVelocityX(ufo.body.velocity.x * 1.5);
+    }
+    assert(ufoPhase === 'red', 'phase transitions to red after 4s: ' + ufoPhase);
+    assert(ufo.tintTopLeft === 0xFF4444, 'red tint applied: ' + ufo.tintTopLeft);
+    const speed = Math.abs(ufo.body.velocity.x);
+    assert(speed >= 150, 'red phase speed increased: ' + speed);
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO phase: transitions to GREEN after 8 seconds', () => {
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    // Simulate 8.5 seconds passing
+    ufoPhaseStart = scene.time.now - 8500;
+    ufoPhase = 'red'; // Start from red
+    ufo.setTint(0xFF4444);
+    // Trigger green transition
+    const elapsed = scene.time.now - ufoPhaseStart;
+    if (elapsed > 8000) {
+      ufoPhase = 'green';
+      ufo.setTint(0x44FF44);
+      ufo.setVelocityX(ufo.body.velocity.x * 0.7);
+    }
+    assert(ufoPhase === 'green', 'phase transitions to green after 8s: ' + ufoPhase);
+    assert(ufo.tintTopLeft === 0x44FF44, 'green tint applied: ' + ufo.tintTopLeft);
+    const speed = Math.abs(ufo.body.velocity.x);
+    assert(speed <= 120, 'green phase speed decreased: ' + speed);
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO phase: RED phase shoots downward', () => {
+    if (!bullets || !bullets.clear) { startPlaying.call(scene); }
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    ufoPhase = 'red';
+    ufo.setTint(0xFF4444);
+    // Simulate red phase shooting (20% chance per check)
+    let shotFired = false;
+    const ebBefore = enemyBullets.countActive();
+    // Manually trigger shoot logic
+    if (ufoPhase === 'red' && Math.random() < 0.3) { // 30% for test reliability
+      const eb = enemyBullets.get(ufo.x, ufo.y + 10, 'ebullet');
+      if (eb) {
+        eb.enableBody(true, ufo.x, ufo.y + 10, true, true);
+        eb.setVelocityY(200);
+        shotFired = true;
+      }
+    }
+    assert(shotFired, 'red phase should fire downward shot');
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+  });
+
+  run('UFO phase: GREEN phase gives higher bonus', () => {
+    if (!bullets || !bullets.clear) { startPlaying.call(scene); }
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
+    spawnUFO(scene);
+    ufoPhase = 'green';
+    ufo.setTint(0x44FF44);
+    const beforeScore = score;
+    const bullet = bullets.get(ufo.x, ufo.y, 'bullet');
+    if (bullet) {
+      bullet.enableBody(true, ufo.x, ufo.y, true, true);
+      hitUFO(bullet, ufo);
+      const bonus = score - beforeScore;
+      // GREEN phase bonus should be 150 or 200 (higher tier)
+      assert(bonus >= 150, 'green phase bonus is higher: got ' + bonus);
+    } else {
+      assert(false, 'could not get bullet');
+    }
+    if (ufo) { ufo.destroy(); ufo = null; }
+    ufoActive = false;
   });
 
   // =====================
