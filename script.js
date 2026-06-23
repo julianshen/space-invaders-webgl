@@ -460,10 +460,8 @@ function toggleCRT() {
 
 function enableShaderCRT(scene) {
   disableCRT(scene);
-  if (window.CRTPipeline && scene.renderer.pipelines) {
-    crtPipeline = scene.renderer.pipelines.add('CRT', new CRTPipeline(scene.game));
-    scene.cameras.main.setRenderToTexture(crtPipeline);
-  }
+  // setRenderToTexture not available in Phaser 3.55.2
+  // Skip shader CRT to prevent crash
 }
 
 function enableCameraCRT(scene) {
