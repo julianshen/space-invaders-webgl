@@ -449,28 +449,13 @@ let deadUntil = 0;
 let gameReady = false;
 
 // === CRT Effect System ===
-let crtMode = 'off'; // 'off' | 'shader' | 'camera'
+let crtMode = 'shader'; // 'off' | 'shader' | 'camera'
 let crtPipeline = null;
 let cameraPostRender = null;
 
 function toggleCRT() {
-  const scene = game.scene.scenes[0];
-  if (!scene) return;
-  
-  // Cycle: off -> shader -> camera -> off
-  if (crtMode === 'off') {
-    crtMode = 'shader';
-    enableShaderCRT(scene);
-  } else if (crtMode === 'shader') {
-    crtMode = 'camera';
-    enableCameraCRT(scene);
-  } else {
-    crtMode = 'off';
-    disableCRT(scene);
-  }
-  
-  // Show feedback text
-  showCRTFeedback(scene);
+  // CRT is always on by default, toggle disabled
+  return;
 }
 
 function enableShaderCRT(scene) {
@@ -828,6 +813,11 @@ function startPlaying() {
   drawLives.call(this);
   gameReady = true;
   gamePhase = 'playing';
+
+  // Enable CRT shader by default
+  if (crtMode === 'shader' && window.CRTPipeline && this.renderer.pipelines) {
+    enableShaderCRT(this);
+  }
 
   // Initialize UFO spawn timer
   ufoNextSpawn = this.time.now + getUFOSpawnInterval();
