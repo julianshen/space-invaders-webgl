@@ -171,38 +171,26 @@
       position: relative;
     }
 
-    /* ===== CRT 螢幕框 ===== */
+    /* ===== CRT 螢幕框 (使用自訂 bezel 圖) ===== */
     .crt-bezel {
-      background: #080808;
-      border: 6px solid #1a1a1a;
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: url('assets/bezel.jpg') center/cover no-repeat;
       border-radius: 14px;
-      padding: 10px;
-      box-shadow:
-        inset 0 0 50px rgba(0,0,0,0.95),
-        0 0 15px rgba(50,50,80,0.15);
-      position: relative;
-    }
-
-    .crt-frame {
-      border-radius: 10px;
-      background: #000;
-      padding: 4px;
-      position: relative;
       overflow: hidden;
     }
 
-    /* CRT 弧形四角 */
-    .crt-corner {
+    .crt-frame {
       position: absolute;
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 3;
+      top: 75px;      /* 調整此值對齊圖片中的螢幕區域 */
+      left: 90px;     /* 調整此值對齊圖片中的螢幕區域 */
+      width: 620px;   /* 調整此值匹配圖片中的螢幕寬度 */
+      height: 465px;  /* 調整此值匹配圖片中的螢幕高度 */
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
     }
-    .crt-corner.tl { top: -15px; left: -15px; box-shadow: 0 0 20px 10px #000 inset; }
-    .crt-corner.tr { top: -15px; right: -15px; box-shadow: 0 0 20px 10px #000 inset; }
-    .crt-corner.bl { bottom: -15px; left: -15px; box-shadow: 0 0 20px 10px #000 inset; }
-    .crt-corner.br { bottom: -15px; right: -15px; box-shadow: 0 0 20px 10px #000 inset; }
 
     /* CRT 暗角 */
     .crt-shadow {
@@ -242,8 +230,9 @@
 
     .screen-wrapper {
       position: relative;
+      width: 100%;
+      height: 100%;
       background: #000;
-      border-radius: 6px;
       line-height: 0;
       overflow: hidden;
     }
@@ -458,10 +447,6 @@
             <div class="scanlines"></div>
             <div class="screen-reflection"></div>
           </div>
-          <div class="crt-corner tl"></div>
-          <div class="crt-corner tr"></div>
-          <div class="crt-corner bl"></div>
-          <div class="crt-corner br"></div>
         </div>
       </div>
       <div class="control-panel">

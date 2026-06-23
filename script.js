@@ -372,7 +372,7 @@ const SoundManager = {
           this.fanfare();
         }
       };
-      setTimeout(check, 300);
+      setTimeout(check, 232);
       return;
     }
 
@@ -401,8 +401,8 @@ const SoundManager = {
 // ====================
 const config = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  width: 620,
+  height: 465,
   parent: 'game-container',
   backgroundColor: '#000000',
   pixelArt: true,
@@ -641,12 +641,12 @@ function create() {
   ectx.fillRect(0, 0, 4, 8);
   eBulletGfx.refresh();
 
-  // 用程式生成星空背景（800x600 tileSprite）
-  const starCanvas = this.textures.createCanvas('starfield', 800, 600);
+  // 用程式生成星空背景（620x465 tileSprite）
+  const starCanvas = this.textures.createCanvas('starfield', 620, 465);
   const sctx = starCanvas.getContext();
   for (let i = 0; i < 250; i++) {
-    const sx = Math.random() * 800;
-    const sy = Math.random() * 600;
+    const sx = Math.random() * 620;
+    const sy = Math.random() * 465;
     const bright = Math.floor(Math.random() * 160 + 95);
     const size = Math.random() > 0.92 ? 2 : 1;
     sctx.fillStyle = `rgb(${bright},${bright},${bright})`;
@@ -655,7 +655,7 @@ function create() {
   starCanvas.refresh();
 
   // 星空層放在最底下（在 player 和 invaders 之前加入）
-  starfield = this.add.tileSprite(0, 0, 800, 600, 'starfield').setOrigin(0, 0).setDepth(-1);
+  starfield = this.add.tileSprite(0, 0, 620, 465, 'starfield').setOrigin(0, 0).setDepth(-1);
 
   // 用程式生成爆炸 spritesheet（8 幀，更流暢）
   const expFrames = 8;
@@ -753,7 +753,7 @@ function create() {
   ufoGfx.refresh();
 
   // Phase 1: Blue intro text
-  introTexts.blueText = this.add.text(400, 300,
+  introTexts.blueText = scene.add.text(310, 232,
     'A long time ago in a galaxy\nfar, far away....', {
     fontFamily: 'monospace',
     fontSize: '22px',
@@ -763,7 +763,7 @@ function create() {
   }).setOrigin(0.5).setAlpha(0).setDepth(200);
 
   // Phase 2: Big yellow logo
-  introTexts.logo = this.add.text(400, 280, 'SPACE\nINVADERS', {
+  introTexts.logo = scene.add.text(310, 217, 'SPACE\nINVADERS', {
     fontFamily: 'monospace',
     fontSize: '56px',
     color: '#ffd700',
@@ -777,7 +777,7 @@ function create() {
 
 function startPlaying() {
   // Player - 強制設定合理尺寸
-  player = this.physics.add.sprite(400, 550, 'spaceship');
+  player = this.physics.add.sprite(310, 425, 'spaceship');
   player.setDisplaySize(48, 24);
   player.setCollideWorldBounds(true);
 
@@ -794,15 +794,15 @@ function startPlaying() {
     fontFamily: 'monospace', fontSize: '22px', color: '#00ff00'
   }).setDepth(100);
 
-  gameOverText = this.add.text(400, 220, 'GAME OVER', {
+  gameOverText = this.add.text(310, 170, 'GAME OVER', {
     fontFamily: 'monospace', fontSize: '80px', color: '#ff0000', fontStyle: 'bold'
   }).setOrigin(0.5).setDepth(100).setVisible(false);
 
-  finalScoreText = this.add.text(400, 320, '', {
+  finalScoreText = this.add.text(310, 248, '', {
     fontFamily: 'monospace', fontSize: '30px', color: '#ffdd00'
   }).setOrigin(0.5).setDepth(100).setVisible(false);
 
-  restartText = this.add.text(400, 400, 'PRESS SPACE TO RESTART', {
+  restartText = this.add.text(310, 310, 'PRESS SPACE TO RESTART', {
     fontFamily: 'monospace', fontSize: '28px', color: '#ffff00'
   }).setOrigin(0.5).setDepth(100).setVisible(false);
 
@@ -977,13 +977,13 @@ function rebuildIntro() {
   Object.values(introTexts).forEach(t => { if (t && t.destroy) t.destroy(); });
   introTexts = {};
 
-  introTexts.blueText = scene.add.text(400, 300,
+  introTexts.blueText = scene.add.text(310, 300,
     'A long time ago in a galaxy\nfar, far away....', {
     fontFamily: 'monospace', fontSize: '22px', color: '#4a9eff',
     align: 'center', fontStyle: 'italic'
   }).setOrigin(0.5).setAlpha(0).setDepth(200);
 
-  introTexts.logo = scene.add.text(400, 280, 'SPACE\nINVADERS', {
+  introTexts.logo = scene.add.text(310, 280, 'SPACE\nINVADERS', {
     fontFamily: 'monospace', fontSize: '56px', color: '#ffd700',
     align: 'center', fontStyle: 'bold'
   }).setOrigin(0.5).setVisible(false).setDepth(200);
@@ -1001,10 +1001,10 @@ function skipIntro() {
   // 進入倒數階段
   gamePhase = 'countdown';
   countdownStart = scene.time.now;
-  countdownTexts.ready = scene.add.text(400, 250, 'READY?', {
+  countdownTexts.ready = scene.add.text(310, 194, 'READY?', {
     fontFamily: 'monospace', fontSize: '52px', color: '#ffff00', fontStyle: 'bold'
   }).setOrigin(0.5).setDepth(300).setAlpha(0);
-  countdownTexts.go = scene.add.text(400, 250, 'GO!', {
+  countdownTexts.go = scene.add.text(310, 194, 'GO!', {
     fontFamily: 'monospace', fontSize: '64px', color: '#00ff00', fontStyle: 'bold'
   }).setOrigin(0.5).setDepth(300).setVisible(false);
 }
@@ -1082,7 +1082,7 @@ function runIntro(scene) {
       ];
       crawlText.forEach((line, i) => {
         const y = 700 + i * 32;
-        const txt = scene.add.text(400, y, line, {
+        const txt = scene.add.text(310, y, line, {
           fontFamily: '"Pathway Gothic One", "Arial Narrow", sans-serif',
           fontSize: '16px',
           color: '#ffd700',
@@ -1180,7 +1180,7 @@ function enterDemo() {
   const board = getLeaderboard();
 
   // 標題
-  demoTexts.title = scene.add.text(400, 120, '╔══════════════╗\n║  HIGH SCORES  ║\n╚══════════════╝', {
+  demoTexts.title = scene.add.text(310, 93, '╔══════════════╗\n║  HIGH SCORES  ║\n╚══════════════╝', {
     fontFamily: 'monospace', fontSize: '22px', color: '#ffd700', fontStyle: 'bold', align: 'center'
   }).setOrigin(0.5).setDepth(300).setAlpha(0);
 
@@ -1189,7 +1189,7 @@ function enterDemo() {
   const top5 = board.slice(0, 5);
   if (top5.length === 0) {
     demoTexts.entries.push(
-      scene.add.text(400, 260, 'NO SCORES YET', {
+      scene.add.text(310, 202, 'NO SCORES YET', {
         fontFamily: 'monospace', fontSize: '22px', color: '#888888'
       }).setOrigin(0.5).setDepth(300)
     );
@@ -1198,7 +1198,7 @@ function enterDemo() {
       const rank = (i + 1).toString();
       const medals = ['🥇', '🥈', '🥉', '  ', '  '];
       const y = 190 + i * 50;
-      const txt = scene.add.text(400, y,
+      const txt = scene.add.text(310, y,
         `${medals[i]}  ${rank}st${rank==='1'?'':rank==='2'?'nd':rank==='3'?'rd':'th'}  ·  ${s.toString().padStart(6, '0')}`,
         { fontFamily: 'monospace', fontSize: '24px', color: i === 0 ? '#ffff00' : '#cccccc' }
       ).setOrigin(0.5).setDepth(300);
@@ -1207,12 +1207,12 @@ function enterDemo() {
   }
 
   // 提示文字
-  demoTexts.hint = scene.add.text(400, 500, 'PRESS ANY KEY TO START', {
+  demoTexts.hint = scene.add.text(310, 388, 'PRESS ANY KEY TO START', {
     fontFamily: 'monospace', fontSize: '18px', color: '#888888'
   }).setOrigin(0.5).setDepth(300);
 
   // 小外星人（Rei 指定：1.5x 放大 + 左右飄）
-  demoTexts.alien = scene.add.sprite(400, 420, 'invader').setDepth(300).setScale(1.5);
+  demoTexts.alien = scene.add.sprite(310, 326, 'invader').setDepth(300).setScale(1.5);
   demoTexts.alienDir = 1;
 }
 
@@ -1283,14 +1283,14 @@ function update() {
     if (this.time.now >= deadUntil) {
       if (!player || !player.body) {
         // 重建 player sprite（如果壞了）
-        player = this.physics.add.sprite(400, 550, 'spaceship');
+        player = this.physics.add.sprite(310, 550, 'spaceship');
         player.setDisplaySize(48, 24);
         player.setCollideWorldBounds(true);
         // 重新註冊 overlap（player 被重建了）
         this.physics.world.removeCollider(this._playerHitCollider);
         this._playerHitCollider = this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
       }
-      player.setPosition(400, 550);
+      player.setPosition(310, 425);
       player.setVisible(true);
       player.body.enable = true;
       playerDead = false;
@@ -1406,7 +1406,7 @@ function update() {
       if (inv && inv.active && inv.body) {
         // 反彈後速度稍微加快（越打越快，但幅度小一點）
         const currentSpeed = Math.abs(inv.body.velocity.x);
-        const newSpeed = Math.min(currentSpeed + 2, 220);
+        const newSpeed = Math.min(currentSpeed + 2, 170);
         const dir = side === 'left' ? 1 : -1;
         inv.setVelocityX(newSpeed * dir);
         // 階梯式掉落：後排掉得少，前排掉得多
@@ -1626,7 +1626,7 @@ function restartGame() {
     scene.physics.world.removeCollider(scene._playerHitCollider);
   }
   if (player) player.destroy();
-  player = scene.physics.add.sprite(400, 550, 'spaceship');
+  player = scene.physics.add.sprite(310, 550, 'spaceship');
   player.setDisplaySize(48, 24);
   player.setCollideWorldBounds(true);
   scene._playerHitCollider = scene.physics.add.overlap(enemyBullets, player, hitPlayer, null, scene);
