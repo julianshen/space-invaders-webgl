@@ -10,7 +10,10 @@ const SoundManager = {
   init() {
     if (this.inited) return;
     try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // 延遲創建 AudioContext，避免 Chrome autoplay policy 警告
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this.ctx = new Ctx();
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.35;
       this.masterGain.connect(this.ctx.destination);
@@ -28,10 +31,13 @@ const SoundManager = {
 
   // 解鎖 audio：第一次使用者互動時呼叫，繞過 autoplay policy
   unlockAudio() {
-    this.init();
+    // 延遲創建 AudioContext，避免 Chrome autoplay policy 警告
+    if (!this.inited) {
+      this.init();
+    }
     this.resume();
     // Pre-fetch + decode MP3 到 AudioBuffer，供後續 playFanfare 使用
-    if (!this._fanfareBuffer && !this._fanfareLoading) {
+    if (!this._fanfareBuffer && !this._fanfareLoading && this.ctx) {
       this._fanfareLoading = true;
       fetch('fanfare.mp3')
         .then(r => r.arrayBuffer())
@@ -400,7 +406,7 @@ const SoundManager = {
 // Phaser Game Logic
 // ====================
 const config = {
-  type: Phaser.AUTO,
+  type: Phaser.WEBGL,
   width: 600,
   height: 450,
   parent: 'game-container',
