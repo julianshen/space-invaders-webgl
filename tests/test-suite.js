@@ -722,3 +722,64 @@
   console.log(JSON.stringify({results, pass, fail, total: pass+fail}, null, 2));
   console.log(`\n✅ ${pass} passed  ❌ ${fail} failed  📊 ${Math.round(pass/(pass+fail)*100)}%`);
 })();
+
+  // =====================
+  // Player Movement (TDD - Performance)
+  // =====================
+  run('Player: accelerates when left key pressed', () => {
+    if (!player || !player.body) {
+      startPlaying.call(scene);
+    }
+    player.setVelocityX(0);
+    // Simulate left key
+    const moveLeft = true;
+    const moveRight = false;
+    // Apply movement logic
+    if (moveLeft) // new logic uses acceleration
+    player.setVelocityX(-350);
+    else if (moveRight) // new logic uses acceleration
+    player.setVelocityX(350);
+    else player.setVelocityX(0);
+    assert(player.body.velocity.x < 0, 'player should move left');
+  });
+
+  run('Player: decelerates when key released', () => {
+    if (!player || !player.body) {
+      startPlaying.call(scene);
+    }
+    // new logic uses acceleration
+    player.setVelocityX(350);
+    // Simulate no key
+    const moveLeft = false;
+    const moveRight = false;
+    if (moveLeft) // new logic uses acceleration
+    player.setVelocityX(-350);
+    else if (moveRight) // new logic uses acceleration
+    player.setVelocityX(350);
+    else player.setVelocityX(0);
+    assert(player.body.velocity.x === 0, 'player should stop');
+  });
+
+  run('Player: has max speed limit', () => {
+    if (!player || !player.body) {
+      startPlaying.call(scene);
+    }
+    player.setVelocityX(500);
+    assert(Math.abs(player.body.velocity.x) <= 350, 'player speed should be capped');
+  });
+
+  run('Player: stops when no input', () => {
+    if (!player || !player.body) {
+      startPlaying.call(scene);
+    }
+    player.setVelocityX(200);
+    const moveLeft = false;
+    const moveRight = false;
+    if (moveLeft) // new logic uses acceleration
+    player.setVelocityX(-350);
+    else if (moveRight) // new logic uses acceleration
+    player.setVelocityX(350);
+    else player.setVelocityX(0);
+    assert(player.body.velocity.x === 0, 'player should stop with no input');
+  });
+

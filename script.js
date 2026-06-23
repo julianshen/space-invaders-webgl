@@ -1183,10 +1183,38 @@ function update() {
     // 鍵盤方向鍵或螢幕搖桿皆可控制
     const moveLeft = cursors.left.isDown || touchState.left;
     const moveRight = cursors.right.isDown || touchState.right;
-    if (player) {
-      if (moveLeft) player.setVelocityX(-220);
-      else if (moveRight) player.setVelocityX(220);
-      else player.setVelocityX(0);
+    if (player && player.body) {
+      const maxSpeed = 350;
+      const acceleration = 2000; // pixels per second squared
+      const friction = 1500; // pixels per second squared
+      const dt = this.game.loop.delta / 1000; // delta time in seconds
+
+      let targetVelocity = 0;
+      if (moveLeft) targetVelocity = -maxSpeed;
+      else if (moveRight) targetVelocity = maxSpeed;
+
+      const currentVelocity = player.body.velocity.x;
+      let newVelocity;
+
+      if (targetVelocity !== 0) {
+        // Accelerating towards target
+        const direction = Math.sign(targetVelocity);
+        newVelocity = currentVelocity + direction * acceleration * dt;
+        // Clamp to max speed
+        if (direction > 0) newVelocity = Math.min(newVelocity, maxSpeed);
+        else newVelocity = Math.max(newVelocity, -maxSpeed);
+      } else {
+        // Decelerating to stop
+        if (currentVelocity > 0) {
+          newVelocity = Math.max(0, currentVelocity - friction * dt);
+        } else if (currentVelocity < 0) {
+          newVelocity = Math.min(0, currentVelocity + friction * dt);
+        } else {
+          newVelocity = 0;
+        }
+      }
+
+      player.setVelocityX(newVelocity);
     }
 
     // 按住空白鍵或螢幕火力鍵連發（shoot 內含 180ms 冷卻）
