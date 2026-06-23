@@ -20,6 +20,18 @@
       overflow: hidden;
     }
 
+    /* 地板光影 */
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 1000px; height: 300px;
+      background: radial-gradient(ellipse at center bottom, rgba(255,180,50,0.06), transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
     /* ===== Toast Notification ===== */
     .toast-container {
       position: fixed;
@@ -63,34 +75,175 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(68,136,255,0.4);
     }
 
-    /* ===== Cabinet (使用自訂 bezel 圖) ===== */
+    /* ===== 主機櫃 ===== */
     .cabinet {
       position: relative;
-      width: 1067px;
-      height: 800px;
-      background: url('bezel.jpg') center top / cover no-repeat;
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 0 60px rgba(0,0,0,0.9), 0 15px 40px rgba(0,0,0,0.7);
+      z-index: 1;
+      padding: 0;
     }
 
-    /* 遊戲畫面區域 - 放在 bezel 圖片中央黑色區域 */
-    .screen-area {
+    .cabinet-inner {
+      background: linear-gradient(180deg, #1a1410 0%, #0e0a08 100%);
+      border: 4px solid #3a3028;
+      border-radius: 18px;
+      padding: 22px 28px 18px;
+      box-shadow:
+        0 0 60px rgba(0,0,0,0.9),
+        0 15px 40px rgba(0,0,0,0.7),
+        inset 0 0 40px rgba(0,0,0,0.5);
+      position: relative;
+    }
+
+    /* 木紋側板 */
+    .cabinet-side {
       position: absolute;
-      top: 100px;
-      left: 133px;
-      width: 800px;
-      height: 600px;
-      background: #000;
-      border-radius: 4px;
+      top: -8px; bottom: -8px;
+      width: 18px;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          #2a2018 0px, #342a22 2px, #2a2018 4px, #1e1612 6px
+        );
+      border-radius: 6px;
+      opacity: 0.8;
+    }
+    .cabinet-side.left-side {
+      left: -14px;
+      box-shadow: inset -2px 0 6px rgba(0,0,0,0.6);
+    }
+    .cabinet-side.right-side {
+      right: -14px;
+      box-shadow: inset 2px 0 6px rgba(0,0,0,0.6);
+    }
+
+    /* T-molding 螢光邊條 */
+    .cabinet-inner::before {
+      content: '';
+      position: absolute;
+      top: -8px; left: -8px; right: -8px; bottom: -8px;
+      border: 3px solid #4a3a2e;
+      border-radius: 22px;
+      pointer-events: none;
+      box-shadow: 0 0 8px rgba(80,60,40,0.3);
+    }
+
+    /* ===== 壓克力面板 ===== */
+    .marquee {
+      text-align: center;
+      margin-bottom: 14px;
+      padding: 16px 24px 12px;
+      position: relative;
       overflow: hidden;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #ffcc00 0%, #ff8800 60%, #cc5500 100%);
+      box-shadow:
+        0 0 25px rgba(255,180,0,0.25),
+        inset 0 5px 15px rgba(255,200,100,0.3),
+        inset 0 -5px 15px rgba(0,0,0,0.2);
+    }
+    .marquee-glow {
+      position: absolute;
+      top: -2px; left: -2px; right: -2px; bottom: -2px;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0px, transparent 30px,
+        rgba(255,255,255,0.03) 30px, rgba(255,255,255,0.03) 31px
+      );
+      pointer-events: none;
+      border-radius: 6px;
+    }
+    .marquee-text {
+      font-size: 28px;
+      color: #fff;
+      text-shadow:
+        4px 4px 0 #884400,
+        -1px -1px 0 rgba(255,255,200,0.3),
+        0 0 30px rgba(255,255,200,0.2);
+      letter-spacing: 8px;
+      position: relative;
+    }
+    .marquee-sub {
+      font-size: 10px;
+      color: #ffdd88;
+      margin-top: 6px;
+      letter-spacing: 4px;
+      text-shadow: 1px 1px 0 #663300;
+      position: relative;
+    }
+
+    /* ===== CRT 螢幕框 ===== */
+    .crt-bezel {
+      background: #080808;
+      border: 6px solid #1a1a1a;
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow:
+        inset 0 0 50px rgba(0,0,0,0.95),
+        0 0 15px rgba(50,50,80,0.15);
+      position: relative;
+    }
+
+    .crt-frame {
+      border-radius: 10px;
+      background: #000;
+      padding: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* CRT 弧形四角 */
+    .crt-corner {
+      position: absolute;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .crt-corner.tl { top: -15px; left: -15px; box-shadow: 0 0 20px 10px #000 inset; }
+    .crt-corner.tr { top: -15px; right: -15px; box-shadow: 0 0 20px 10px #000 inset; }
+    .crt-corner.bl { bottom: -15px; left: -15px; box-shadow: 0 0 20px 10px #000 inset; }
+    .crt-corner.br { bottom: -15px; right: -15px; box-shadow: 0 0 20px 10px #000 inset; }
+
+    /* CRT 暗角 */
+    .crt-shadow {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* 掃描線 */
+    .scanlines {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 2px,
+        rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px
+      );
+      pointer-events: none;
+      z-index: 2;
+      mix-blend-mode: multiply;
+    }
+
+    /* 螢幕玻璃反射 */
+    .screen-reflection {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(255,255,255,0.03) 0%, transparent 30%,
+        transparent 70%, rgba(255,255,255,0.02) 100%
+      );
+      pointer-events: none;
+      z-index: 2;
     }
 
     .screen-wrapper {
       position: relative;
-      width: 100%;
-      height: 100%;
       background: #000;
+      border-radius: 6px;
       line-height: 0;
       overflow: hidden;
     }
@@ -98,8 +251,188 @@
     canvas {
       display: block;
       image-rendering: pixelated;
-      width: 100%;
-      height: 100%;
+      width: 800px;
+      height: 600px;
+    }
+
+    /* ===== 控制面板 ===== */
+    .control-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 14px;
+      padding: 6px 6px 0;
+      gap: 12px;
+    }
+
+    .panel-left, .panel-right {
+      flex: 0 0 auto;
+    }
+
+    .panel-center {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      padding: 6px 10px;
+    }
+
+    .credit-area {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .credit-label {
+      color: #887766;
+      font-size: 8px;
+      letter-spacing: 2px;
+    }
+    .credit-num {
+      color: #ffdd00;
+      font-size: 20px;
+      text-shadow: 0 0 15px rgba(255,220,0,0.3);
+      letter-spacing: 4px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .arcade-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+      position: relative;
+      transition: transform 0.03s;
+      font-family: 'Press Start 2P', monospace;
+    }
+    .arcade-btn:hover { transform: scale(1.05); }
+    .arcade-btn:active { transform: translateY(4px); }
+
+    .arcade-btn span {
+      font-size: 13px;
+      color: #fff;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      margin-top: -2px;
+    }
+
+    .arcade-btn.fire {
+      background: radial-gradient(circle at 35% 30%, #cc4422, #881100 60%, #550800);
+      border: 4px solid #441111;
+      box-shadow:
+        0 6px 0 #330000,
+        0 8px 12px rgba(0,0,0,0.5),
+        inset 0 -4px 6px rgba(0,0,0,0.3),
+        inset 0 2px 6px rgba(255,140,80,0.25);
+    }
+    .arcade-btn.fire::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 12px;
+      width: 22px; height: 10px;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.4), transparent);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .arcade-btn.coin {
+      width: 44px;
+      height: 44px;
+      background: radial-gradient(circle at 35% 30%, #ffdd55, #cc8800 60%, #996600);
+      border: 4px solid #774400;
+      box-shadow:
+        0 5px 0 #553300,
+        0 8px 12px rgba(0,0,0,0.5),
+        inset 0 -4px 6px rgba(0,0,0,0.3),
+        inset 0 2px 6px rgba(255,200,50,0.3);
+    }
+    .arcade-btn.coin span { font-size: 8px; }
+    .arcade-btn.coin::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 10px;
+      width: 20px; height: 8px;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.3), transparent);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .joystick-base {
+      width: 48px;
+      height: 48px;
+      background: radial-gradient(circle at 40% 35%, #2a2a2a, #111);
+      border-radius: 50%;
+      border: 2px solid #333;
+      box-shadow:
+        0 4px 6px rgba(0,0,0,0.5),
+        inset 0 3px 6px rgba(0,0,0,0.6);
+      position: relative;
+      cursor: pointer;
+      touch-action: none;
+    }
+    .joystick-stick {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -65%);
+      width: 10px;
+      height: 30px;
+      background: linear-gradient(90deg, #444, #222 50%, #333);
+      border-radius: 5px 5px 3px 3px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      pointer-events: none; /* 讓指標事件落在 joystick-base 上 */
+    }
+    .joystick-stick::after {
+      content: '';
+      position: absolute;
+      top: -8px; left: -4px;
+      width: 18px; height: 12px;
+      background: radial-gradient(circle at 40% 35%, #ff3333, #cc0000);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+
+    .coin-slot {
+      display: flex;
+      align-items: center;
+    }
+    .coin-insert {
+      width: 28px;
+      height: 40px;
+      background: linear-gradient(180deg, #553300, #332200);
+      border: 2px solid #664422;
+      border-radius: 4px 4px 6px 6px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 6px;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
+    }
+    .coin-slit {
+      width: 4px;
+      height: 14px;
+      background: #000;
+      border: 1px solid #886644;
+      border-radius: 1px;
+      box-shadow: 0 0 6px rgba(255,200,0,0.15);
+    }
+
+    .cabinet-footer {
+      margin-top: 10px;
+      text-align: center;
+      padding: 6px 0 2px;
+    }
+    .footer-text {
+      color: #554433;
+      font-size: 7px;
+      letter-spacing: 3px;
     }
   </style>
 </head>
@@ -108,12 +441,59 @@
     <div class="toast" id="crt-toast">CRT: OFF</div>
   </div>
   <div class="cabinet">
-    <div class="screen-area" id="game-container">
-      <div class="screen-wrapper"></div>
+    <!-- 木紋 cabinet 側面 -->
+    <div class="cabinet-side left-side"></div>
+    <div class="cabinet-side right-side"></div>
+    <div class="cabinet-inner">
+      <div class="marquee">
+        <div class="marquee-glow"></div>
+        <div class="marquee-text">SPACE INVADERS</div>
+        <div class="marquee-sub">🪙 INSERT COIN 🪙</div>
+      </div>
+      <!-- CRT 風格的螢幕區域 -->
+      <div class="crt-bezel">
+        <div class="crt-frame">
+          <div class="crt-shadow"></div>
+          <div class="screen-wrapper" id="game-container">
+            <div class="scanlines"></div>
+            <div class="screen-reflection"></div>
+          </div>
+          <div class="crt-corner tl"></div>
+          <div class="crt-corner tr"></div>
+          <div class="crt-corner bl"></div>
+          <div class="crt-corner br"></div>
+        </div>
+      </div>
+      <div class="control-panel">
+        <div class="panel-left">
+          <div class="credit-area">
+            <div class="credit-label">CREDIT</div>
+            <div class="credit-num">01</div>
+          </div>
+        </div>
+        <div class="panel-center">
+          <div class="joystick-base">
+            <div class="joystick-stick"></div>
+          </div>
+          <div class="btn-row">
+            <div class="arcade-btn coin"><span>COIN</span></div>
+            <div class="arcade-btn fire"><span>A</span></div>
+          </div>
+        </div>
+        <div class="panel-right">
+          <div class="coin-slot">
+            <div class="coin-insert">
+              <div class="coin-slit"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-footer"></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
   <script src="crt-pipeline.js"></script>
   <script src="script.js"></script>
+
 </body>
 </html>
