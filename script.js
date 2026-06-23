@@ -448,6 +448,102 @@ let invulTimer = 0;
 let deadUntil = 0;
 let gameReady = false;
 
+// === CRT Effect System ===
+let crtMode = 'off'; // 'off' | 'shader' | 'camera'
+let crtPipeline = null;
+let cameraPostRender = null;
+
+function toggleCRT() {
+  const scene = game.scene.scenes[0];
+  if (!scene) return;
+  
+  // Cycle: off -> shader -> camera -> off
+  if (crtMode === 'off') {
+    crtMode = 'shader';
+    enableShaderCRT(scene);
+  } else if (crtMode === 'shader') {
+    crtMode = 'camera';
+    enableCameraCRT(scene);
+  } else {
+    crtMode = 'off';
+    disableCRT(scene);
+  }
+  
+  // Show feedback text
+  showCRTFeedback(scene);
+}
+
+function enableShaderCRT(scene) {
+  disableCRT(scene);
+  if (window.CRTPipeline && scene.renderer.pipelines) {
+    crtPipeline = scene.renderer.pipelines.add('CRT', new CRTPipeline(scene.game));
+    scene.cameras.main.setRenderToTexture(crtPipeline);
+  }
+}
+
+function enableCameraCRT(scene) {
+  disableCRT(scene);
+  cameraPostRender = function(camera) {
+    const ctx = camera.context;
+    const width = camera.width;
+    const height = camera.height;
+    
+    // Scanlines
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < height; y += 3) {
+      ctx.fillRect(0, y, width, 1);
+    }
+    
+    // Vignette
+    const gradient = ctx.createRadialGradient(width/2, height/2, width*0.3, width/2, height/2, width*0.8);
+    gradient.addColorStop(0, 'transparent');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(0, 0, width, height);
+    
+    // Screen curvature simulation (darken edges)
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, 20);
+    ctx.fillRect(0, height-20, width, 20);
+    ctx.fillRect(0, 0, 20, height);
+    ctx.fillRect(width-20, 0, 20, height);
+    
+    ctx.restore();
+  };
+  scene.cameras.main.on('postrender', cameraPostRender);
+}
+
+function disableCRT(scene) {
+  if (crtPipeline) {
+    scene.cameras.main.clearRenderToTexture();
+    crtPipeline = null;
+  }
+  if (cameraPostRender) {
+    scene.cameras.main.off('postrender', cameraPostRender);
+    cameraPostRender = null;
+  }
+}
+
+function showCRTFeedback(scene) {
+  const modeText = crtMode === 'off' ? 'CRT: OFF' : crtMode === 'shader' ? 'CRT: SHADER' : 'CRT: CAMERA';
+  const text = scene.add.text(400, 50, modeText, {
+    fontFamily: 'monospace',
+    fontSize: '16px',
+    color: '#00ff00'
+  }).setOrigin(0.5).setDepth(1000);
+  
+  scene.tweens.add({
+    targets: text,
+    alpha: 0,
+    duration: 1500,
+    onComplete: () => text.destroy()
+  });
+}
+
 // === 觸控 / 螢幕控制狀態（由 setupTouchControls 維護） ===
 const touchState = { left: false, right: false, fire: false };
 
@@ -1547,10 +1643,16 @@ window.addEventListener('keydown', e => {
   if (gamePhase === 'intro') {
     introIdleStart = game.scene.scenes[0].time.now;
   }
-
   // 片頭期間按空白鍵開始遊戲
-  if (gamePhase === 'intro' && (e.key === ' ' || e.code === 'Space')) {
+  if (gamePhase === 'intro' && (e.key === ' ' || e.code === 'Space' || e.keyCode === 32)) {
+    e.preventDefault();
     skipIntro();
+    return;
+  }
+
+  // 按 C 鍵切換 CRT 效果
+  if (e.key === 'c' || e.key === 'C' || e.code === 'KeyC') {
+    toggleCRT();
     return;
   }
 

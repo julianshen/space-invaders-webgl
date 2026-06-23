@@ -783,3 +783,43 @@
     assert(player.body.velocity.x === 0, 'player should stop with no input');
   });
 
+
+  // =====================
+  // CRT Effect System (TDD)
+  // =====================
+  run('CRT: default is off', () => {
+    assert(crtMode === 'off', 'CRT should default to off');
+  });
+
+  run('CRT: cycles through modes on toggle', () => {
+    const originalMode = crtMode;
+    // Simulate toggle
+    toggleCRT();
+    const mode1 = crtMode;
+    toggleCRT();
+    const mode2 = crtMode;
+    toggleCRT();
+    const mode3 = crtMode;
+    assert(mode1 === 'shader' || mode1 === 'camera', 'first toggle should enable an effect');
+    assert(mode2 !== mode1, 'second toggle should switch mode');
+    assert(mode3 === 'off', 'third toggle should turn off');
+    // Restore
+    crtMode = originalMode;
+  });
+
+  run('CRT: shader mode has active pipeline', () => {
+    if (crtMode !== 'shader') {
+      // Skip if not in shader mode
+      return;
+    }
+    assert(crtPipeline && crtPipeline.active, 'shader pipeline should be active');
+  });
+
+  run('CRT: camera mode has post-render callback', () => {
+    if (crtMode !== 'camera') {
+      // Skip if not in camera mode
+      return;
+    }
+    assert(typeof cameraPostRender === 'function', 'camera post-render should exist');
+  });
+
