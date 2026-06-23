@@ -248,6 +248,57 @@
   });
 
   // =====================
+  // Invader Overlap Fix (TDD)
+  // =====================
+  run('invader: all invaders move in same direction', () => {
+    restartGame();
+    createWave.call(scene, 1);
+    const active = invaders.getChildren().filter(i => i.active && i.body);
+    assert(active.length > 0, 'need active invaders');
+    // All invaders should have the same velocity direction
+    const firstDir = Math.sign(active[0].body.velocity.x);
+    const allSameDir = active.every(inv => Math.sign(inv.body.velocity.x) === firstDir);
+    assert(allSameDir, 'all invaders move in same direction, got dirs: ' + 
+      active.map(i => Math.sign(i.body.velocity.x)).join(','));
+  });
+
+  run('invader: no overlap after bounce', () => {
+    restartGame();
+    createWave.call(scene, 1);
+    const active = invaders.getChildren().filter(i => i.active && i.body);
+    assert(active.length > 0, 'need active invaders');
+    // Simulate a bounce by pushing all invaders to left boundary
+    active.forEach(inv => { inv.x = 30; inv.body.velocity.x = -50; });
+    // Manually trigger the bounce logic from update()
+    const invaderSnapshot = invaders.getChildren().slice();
+    let bounce = false;
+    for (const inv of invaderSnapshot) {
+      if (!inv || !inv.active || !inv.body) continue;
+      if (inv.x < 40 && inv.body.velocity.x < 0) { bounce = true; break; }
+    }
+    if (bounce) {
+      invaders.getChildren().slice().forEach(inv => {
+        if (inv && inv.active && inv.body) {
+          const row = inv.getData('row') || 0;
+          const dropAmount = 6 + row * 1.5;
+          inv.y += dropAmount;
+        }
+      });
+    }
+    // Check that no two invaders overlap (x distance should be at least displaySize)
+    const sorted = active.slice().sort((a, b) => a.x - b.x);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      // Only check same row
+      if (a.y === b.y) {
+        const dx = Math.abs(b.x - a.x);
+        assert(dx >= 42, 'invaders overlap: dx=' + dx + ' at y=' + a.y);
+      }
+    }
+  });
+
+  // =====================
   // Regression Guards
   // =====================
   run('reg: null player guard fallback', () => {

@@ -767,13 +767,14 @@ function createWave(waveNum) {
   const spacingX = 68;
   const startX = 110;
 
+  // 整個敵陣統一方向移動（經典 Space Invaders 行為）
+  const formationDir = (waveNum % 2 === 0) ? 1 : -1;
+  const formationSpeed = INVADER_BASE_SPEED + (waveNum - 1) * 18;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const inv = invaders.create(startX + col * spacingX, 90 + row * 55, 'invader');
       inv.setDisplaySize(42, 24);
-      // 隨機初始方向，讓敵人不會全部同方向移動
-      const dir = (Math.random() > 0.5) ? 1 : -1;
-      inv.setVelocityX((INVADER_BASE_SPEED + (waveNum - 1) * 18) * dir);
+      inv.setVelocityX(formationSpeed * formationDir);
       // 記錄每隻敵人的原始 row，用來做階梯式掉落
       inv.setData('row', row);
     }
