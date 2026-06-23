@@ -808,9 +808,9 @@ function startPlaying() {
   gameReady = true;
   gamePhase = 'playing';
 
-  // Enable CRT shader by default
-  if (crtMode === 'shader' && window.CRTPipeline && this.renderer.pipelines) {
-    enableShaderCRT(this);
+  // Enable CRT camera effect by default (shader not available in Phaser 3.55.2)
+  if (crtMode === 'shader' || crtMode === 'camera') {
+    enableCameraCRT(this);
   }
 
   // Initialize UFO spawn timer
