@@ -105,11 +105,11 @@ class CRTPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
     
     onBoot() {
         this.set2f('resolution', this.renderer.width, this.renderer.height);
-        this.set1f('scanlineIntensity', 0.5);
-        this.set1f('curvature', 3.0);
-        this.set1f('vignetteIntensity', 1.5);
-        this.set1f('noiseIntensity', 0.02);
-        this.set1f('chromaticIntensity', 2.0);
+        this.set1f('scanlineIntensity', 1.2);
+        this.set1f('curvature', 2.0);
+        this.set1f('vignetteIntensity', 2.5);
+        this.set1f('noiseIntensity', 0.04);
+        this.set1f('chromaticIntensity', 3.0);
     }
     
     onRender() {

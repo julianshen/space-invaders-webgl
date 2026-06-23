@@ -488,29 +488,57 @@ function enableCameraCRT(scene) {
     const width = camera.width;
     const height = camera.height;
     
-    // Scanlines
     ctx.save();
-    ctx.globalAlpha = 0.1;
+    
+    // Scanlines - stronger effect
+    ctx.globalAlpha = 0.25;
     ctx.fillStyle = '#000';
-    for (let y = 0; y < height; y += 3) {
+    for (let y = 0; y < height; y += 2) {
       ctx.fillRect(0, y, width, 1);
     }
     
-    // Vignette
-    const gradient = ctx.createRadialGradient(width/2, height/2, width*0.3, width/2, height/2, width*0.8);
+    // RGB phosphor separation simulation
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#f00';
+    for (let y = 0; y < height; y += 3) {
+      ctx.fillRect(0, y, width, 1);
+    }
+    ctx.fillStyle = '#00f';
+    for (let y = 1; y < height; y += 3) {
+      ctx.fillRect(0, y, width, 1);
+    }
+    
+    // Vignette - stronger
+    const gradient = ctx.createRadialGradient(width/2, height/2, width*0.2, width/2, height/2, width*0.9);
     gradient.addColorStop(0, 'transparent');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
     ctx.fillStyle = gradient;
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.5;
     ctx.fillRect(0, 0, width, height);
     
     // Screen curvature simulation (darken edges)
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = 0.4;
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, width, 20);
-    ctx.fillRect(0, height-20, width, 20);
-    ctx.fillRect(0, 0, 20, height);
-    ctx.fillRect(width-20, 0, 20, height);
+    ctx.fillRect(0, 0, width, 30);
+    ctx.fillRect(0, height-30, width, 30);
+    ctx.fillRect(0, 0, 30, height);
+    ctx.fillRect(width-30, 0, 30, height);
+    
+    // Corner rounding effect
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(width, 0, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, height, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(width, height, 40, 0, Math.PI * 2);
+    ctx.fill();
     
     ctx.restore();
   };
@@ -530,17 +558,42 @@ function disableCRT(scene) {
 
 function showCRTFeedback(scene) {
   const modeText = crtMode === 'off' ? 'CRT: OFF' : crtMode === 'shader' ? 'CRT: SHADER' : 'CRT: CAMERA';
+  const color = crtMode === 'off' ? '#ff4444' : crtMode === 'shader' ? '#44ff44' : '#4488ff';
+  
+  // Create toast container
+  const toastBg = scene.add.rectangle(400, 50, 200, 40, 0x000000, 0.8)
+    .setOrigin(0.5)
+    .setDepth(1000)
+    .setStrokeStyle(2, parseInt(color.replace('#', '0x')));
+  
   const text = scene.add.text(400, 50, modeText, {
-    fontFamily: 'monospace',
-    fontSize: '16px',
-    color: '#00ff00'
-  }).setOrigin(0.5).setDepth(1000);
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: '14px',
+    color: color
+  }).setOrigin(0.5).setDepth(1001);
+  
+  // Slide in animation
+  toastBg.setX(600);
+  text.setX(600);
   
   scene.tweens.add({
-    targets: text,
-    alpha: 0,
-    duration: 1500,
-    onComplete: () => text.destroy()
+    targets: [toastBg, text],
+    x: 400,
+    duration: 300,
+    ease: 'Back.out',
+    onComplete: () => {
+      // Hold for 1.5s then fade out
+      scene.tweens.add({
+        targets: [toastBg, text],
+        alpha: 0,
+        duration: 500,
+        delay: 1500,
+        onComplete: () => {
+          toastBg.destroy();
+          text.destroy();
+        }
+      });
+    }
   });
 }
 
