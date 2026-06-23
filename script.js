@@ -530,11 +530,7 @@ function enableCameraCRT(scene) {
 
 function disableCRT(scene) {
   if (crtPipeline) {
-    if (scene.cameras.main.clearRenderToTexture) {
-      scene.cameras.main.clearRenderToTexture();
-    } else if (scene.cameras.main.setRenderToTexture) {
-      scene.cameras.main.setRenderToTexture();
-    }
+    // clearRenderToTexture / setRenderToTexture not available in Phaser 3.55.2
     crtPipeline = null;
   }
   if (cameraPostRender) {
