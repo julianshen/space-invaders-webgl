@@ -552,11 +552,81 @@ function saveScoreToLeaderboard(finalScore) {
 
 function preload() {
   // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
-  this.load.image('spaceship', 'spaceship.png');
+  // 玩家飛船改為程式生成（見 createShipTexture），不再依賴 spaceship.png。
   this.load.image('invader', 'invader1.png');
 }
 
+// 程式生成玩家飛船貼圖：經典雙砲戰機（綠色機身 + 青色座艙 + 霓虹翼尖）。
+// 48x24 像素藝術，對稱繪製，機頭朝上。
+function createShipTexture(scene) {
+  const W = 48, H = 24, CX = W / 2;
+  if (scene.textures.exists('spaceship')) scene.textures.remove('spaceship');
+  const tex = scene.textures.createCanvas('spaceship', W, H);
+  const ctx = tex.getContext();
+  ctx.imageSmoothingEnabled = false;
+
+  const HULL = '#2ecc40';      // 主機身綠
+  const HULL_DK = '#15772a';   // 暗綠（陰影/輪廓）
+  const HULL_LT = '#7dff9e';   // 亮綠（高光）
+  const COCKPIT = '#29e7ff';   // 青色座艙
+  const COCKPIT_LT = '#bff6ff';// 座艙高光
+  const NEON = '#39ff14';      // 霓虹翼尖
+  const FLAME = '#ffd23f';     // 推進器火焰（黃）
+  const FLAME_HOT = '#ff7b29'; // 推進器火焰（橘）
+
+  // 以中心線對稱填一組多邊形（傳入點即自動鏡像）
+  const poly = (pts, color) => {
+    const draw = (xs) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(xs[0][0], xs[0][1]);
+      for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i][0], xs[i][1]);
+      ctx.closePath();
+      ctx.fill();
+    };
+    draw(pts);
+    draw(pts.map(([x, y]) => [W - x, y])); // 鏡像
+  };
+  const rect = (x, y, w, h, color, mirror = true) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+    if (mirror) ctx.fillRect(W - x - w, y, w, h);
+  };
+
+  // 雙砲管（先畫，讓機身蓋住底部）
+  rect(13, 5, 3, 13, HULL_DK);
+  rect(14, 4, 1, 13, HULL);
+  rect(14, 3, 1, 2, NEON);            // 砲口霓虹
+
+  // 機翼（後掠）
+  poly([[20, 12], [2, 19], [13, 20], [21, 16]], HULL);
+  poly([[20, 16], [4, 20], [13, 21]], HULL_DK); // 機翼下緣陰影
+  rect(2, 17, 4, 2, NEON);            // 翼尖霓虹
+
+  // 機身（機頭三角 + 機體）
+  poly([[CX, 1], [20, 8], [20, 21], [24, 22]], HULL);
+  rect(19, 8, 10, 13, HULL);          // 機體主體
+  poly([[CX, 1], [21, 7], [24, 7]], HULL_LT); // 機頭高光
+
+  // 中央高光帶
+  rect(23, 3, 2, 18, HULL_LT, false);
+
+  // 座艙
+  ctx.fillStyle = COCKPIT;
+  ctx.beginPath();
+  ctx.ellipse(CX, 11, 3.2, 4.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  rect(22, 8, 1, 2, COCKPIT_LT);      // 座艙高光
+
+  // 推進器火焰（機尾）
+  rect(19, 21, 3, 3, FLAME);
+  rect(20, 22, 1, 2, FLAME_HOT);
+
+  tex.refresh();
+}
+
 function create() {
+  createShipTexture(this);
   // 用程式生成子彈貼圖（綠色的長條）
   const bulletGfx = this.textures.createCanvas('bullet', 4, 10);
   const ctx = bulletGfx.getContext();
