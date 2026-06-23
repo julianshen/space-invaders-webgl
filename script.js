@@ -449,9 +449,8 @@ let deadUntil = 0;
 let gameReady = false;
 
 // === CRT Effect System ===
-let crtMode = 'shader'; // 'off' | 'shader' | 'camera'
-let crtPipeline = null;
-let cameraPostRender = null;
+let crtMode = 'shader'; // 'off' | 'shader'
+let crtFilter = null;   // Phaser 4 Filter controller (CRTFilter)
 
 function toggleCRT() {
   // CRT is always on by default, toggle disabled
@@ -460,82 +459,19 @@ function toggleCRT() {
 
 function enableShaderCRT(scene) {
   disableCRT(scene);
-  // setRenderToTexture not available in Phaser 3.55.2
-  // Skip shader CRT to prevent crash
-}
-
-function enableCameraCRT(scene) {
-  disableCRT(scene);
-  cameraPostRender = function(camera) {
-    const ctx = camera.context;
-    const width = camera.width;
-    const height = camera.height;
-    
-    ctx.save();
-    
-    // Scanlines - stronger effect
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < height; y += 2) {
-      ctx.fillRect(0, y, width, 1);
-    }
-    
-    // RGB phosphor separation simulation
-    ctx.globalAlpha = 0.08;
-    ctx.fillStyle = '#f00';
-    for (let y = 0; y < height; y += 3) {
-      ctx.fillRect(0, y, width, 1);
-    }
-    ctx.fillStyle = '#00f';
-    for (let y = 1; y < height; y += 3) {
-      ctx.fillRect(0, y, width, 1);
-    }
-    
-    // Vignette - stronger
-    const gradient = ctx.createRadialGradient(width/2, height/2, width*0.2, width/2, height/2, width*0.9);
-    gradient.addColorStop(0, 'transparent');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
-    ctx.fillStyle = gradient;
-    ctx.globalAlpha = 0.5;
-    ctx.fillRect(0, 0, width, height);
-    
-    // Screen curvature simulation (darken edges)
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, width, 30);
-    ctx.fillRect(0, height-30, width, 30);
-    ctx.fillRect(0, 0, 30, height);
-    ctx.fillRect(width-30, 0, 30, height);
-    
-    // Corner rounding effect
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(0, 0, 40, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(width, 0, 40, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, height, 40, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(width, height, 40, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.restore();
-  };
-  scene.cameras.main.on('postrender', cameraPostRender);
+  // Phaser 4: attach the CRT GLSL shader as a camera Filter (see crt-pipeline.js).
+  if (typeof installCRTFilter === 'function') {
+    crtFilter = installCRTFilter(scene, scene.cameras.main);
+  }
 }
 
 function disableCRT(scene) {
-  if (crtPipeline) {
-    // clearRenderToTexture / setRenderToTexture not available in Phaser 3.55.2
-    crtPipeline = null;
-  }
-  if (cameraPostRender) {
-    scene.cameras.main.off('postrender', cameraPostRender);
-    cameraPostRender = null;
+  if (crtFilter) {
+    // destroy() detaches the controller from the camera's filter list.
+    if (typeof crtFilter.destroy === 'function') {
+      crtFilter.destroy();
+    }
+    crtFilter = null;
   }
 }
 
@@ -767,6 +703,11 @@ function create() {
 
   // Phase 3: Crawl text (will be populated in runIntro)
   crawlLines = [];
+
+  // Enable the CRT shader for the whole experience (menu, intro and gameplay).
+  if (crtMode === 'shader') {
+    enableShaderCRT(this);
+  }
 }
 
 function startPlaying() {
@@ -807,11 +748,6 @@ function startPlaying() {
   drawLives.call(this);
   gameReady = true;
   gamePhase = 'playing';
-
-  // Enable CRT camera effect by default (shader not available in Phaser 3.55.2)
-  if (crtMode === 'shader' || crtMode === 'camera') {
-    enableCameraCRT(this);
-  }
 
   // Initialize UFO spawn timer
   ufoNextSpawn = this.time.now + getUFOSpawnInterval();

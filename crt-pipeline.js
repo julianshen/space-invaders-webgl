@@ -1,12 +1,24 @@
-// CRT Shader Pipeline for Phaser 3
-// Full GLSL shader with scanlines, curvature, chromatic aberration, noise, vignette
+// CRT Filter for Phaser 4 (4.2.0+)
+//
+// Full-screen GLSL post-processing applied to the main camera via Phaser 4's
+// Filter system. This replaces the old Phaser 3 SinglePipeline approach
+// (Phaser.Renderer.WebGL.Pipelines.SinglePipeline), which no longer exists in
+// Phaser 4 — the pipeline system was replaced by camera Filters + RenderNodes.
+//
+// How it fits together:
+//   CRTFilterRenderNode (extends BaseFilterShader) -- runs the fragment shader.
+//     The renderer auto-binds the rendered scene to `uMainSampler` (unit 0).
+//   CRTFilter (extends Filters.Controller) -- holds the tunable params and is
+//     what you attach to a camera's filter list.
+//   installCRTFilter(scene, camera) -- registers the node once and attaches the
+//     controller to camera.filters.internal (full-screen, screen-aligned).
 
 const CRTShader = `
 #define PI 3.14159265359
 
 precision mediump float;
 
-uniform sampler2D uMainSampler;
+uniform sampler2D uMainSampler;   // rendered scene, auto-bound to texture unit 0
 uniform vec2 resolution;
 uniform float time;
 uniform float scanlineIntensity;
@@ -17,18 +29,15 @@ uniform float chromaticIntensity;
 
 varying vec2 outTexCoord;
 
-// Random function for noise
 float random(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-// Scanline effect
 float scanline(vec2 uv, float intensity) {
     float scan = sin(uv.y * resolution.y * PI) * 0.5 + 0.5;
     return pow(scan, intensity) * 0.1 + 0.9;
 }
 
-// Screen curvature
 vec2 curve(vec2 uv, float amount) {
     uv = uv * 2.0 - 1.0;
     uv *= 1.05;
@@ -38,13 +47,11 @@ vec2 curve(vec2 uv, float amount) {
     return uv;
 }
 
-// Vignette effect
 float vignette(vec2 uv, float intensity) {
     vec2 dist = uv - 0.5;
     return 1.0 - dot(dist, dist) * intensity;
 }
 
-// Chromatic aberration
 vec3 chromatic(sampler2D sampler, vec2 uv, float amount) {
     float r = texture2D(sampler, uv + vec2(amount, 0.0)).r;
     float g = texture2D(sampler, uv).g;
@@ -54,70 +61,86 @@ vec3 chromatic(sampler2D sampler, vec2 uv, float amount) {
 
 void main() {
     vec2 uv = outTexCoord;
-    
-    // Apply curvature
+
     vec2 curvedUV = curve(uv, curvature);
-    
-    // Chromatic aberration
+
     vec3 color = chromatic(uMainSampler, curvedUV, chromaticIntensity / resolution.x);
-    
-    // Scanlines
+
     float scan = scanline(curvedUV, scanlineIntensity);
     color *= scan;
-    
-    // Vignette
+
     float vig = vignette(curvedUV, vignetteIntensity);
     color *= vig;
-    
-    // Noise
+
     float noise = random(curvedUV + time) * noiseIntensity;
     color += noise;
-    
-    // Darken edges
+
+    // Black outside the curved screen edge
     if (curvedUV.x < 0.0 || curvedUV.x > 1.0 || curvedUV.y < 0.0 || curvedUV.y > 1.0) {
         color = vec3(0.0);
     }
-    
+
     gl_FragColor = vec4(color, 1.0);
 }
 `;
 
-class CRTPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
-    constructor(game) {
-        super({
-            game: game,
-            fragShader: CRTShader,
-            uniforms: [
-                'uProjectionMatrix',
-                'uViewMatrix',
-                'uModelMatrix',
-                'uMainSampler',
-                'resolution',
-                'time',
-                'scanlineIntensity',
-                'curvature',
-                'vignetteIntensity',
-                'noiseIntensity',
-                'chromaticIntensity'
-            ]
-        });
+// --- Render node: executes the fragment shader against the scene framebuffer ---
+class CRTFilterRenderNode extends Phaser.Renderer.WebGL.RenderNodes.BaseFilterShader {
+    constructor(manager) {
+        // (name, manager, fragmentKey, fragmentSource) — inline source wins.
+        super('CRTFilter', manager, null, CRTShader);
     }
-    
-    onBoot() {
-        this.set2f('resolution', this.renderer.width, this.renderer.height);
-        this.set1f('scanlineIntensity', 1.2);
-        this.set1f('curvature', 2.0);
-        this.set1f('vignetteIntensity', 2.5);
-        this.set1f('noiseIntensity', 0.04);
-        this.set1f('chromaticIntensity', 3.0);
-    }
-    
-    onRender() {
-        this.set1f('time', this.game.loop.time / 1000);
+
+    // Called automatically each render. uMainSampler (the scene) is auto-bound by
+    // the base class to unit 0 — we only set our own uniforms.
+    setupUniforms(controller, drawingContext) {
+        const pm = this.programManager;
+        pm.setUniform('resolution', [drawingContext.width, drawingContext.height]);
+        // Wall-clock time keeps noise/animation moving without depending on the
+        // exact shape of Phaser's loop API (the one cross-version-ambiguous bit).
+        pm.setUniform('time', (performance.now() / 1000) % 3600);
+        pm.setUniform('scanlineIntensity', controller.scanlineIntensity);
+        pm.setUniform('curvature', controller.curvature);
+        pm.setUniform('vignetteIntensity', controller.vignetteIntensity);
+        pm.setUniform('noiseIntensity', controller.noiseIntensity);
+        pm.setUniform('chromaticIntensity', controller.chromaticIntensity);
     }
 }
 
-// Export for use in script.js
+// --- Controller: tunable parameters + the thing you attach to a camera ---
+class CRTFilter extends Phaser.Filters.Controller {
+    constructor(camera) {
+        super(camera, 'CRTFilter'); // 2nd arg must match the registered node name
+        // Defaults tuned to stay readable for an arcade game. Tweak freely.
+        this.scanlineIntensity = 1.2;
+        this.curvature = 4.0;          // higher = flatter (less aggressive than old 2.0)
+        this.vignetteIntensity = 1.3;
+        this.noiseIntensity = 0.015;   // subtle grain; higher washes out small text
+        this.chromaticIntensity = 1.0; // RGB split in px-ish; higher blurs text
+    }
+}
+
+// Register the render node once per renderer, then attach a controller to the
+// camera's internal filter list (internal = filtered in isolation at the
+// camera's exact screen position — the correct choice for a full-screen post-FX).
+// Returns the controller, or null if filters/renderer aren't available.
+function installCRTFilter(scene, camera) {
+    const renderer = scene.renderer || (scene.game && scene.game.renderer);
+    const rn = renderer && renderer.renderNodes;
+    if (!rn || typeof rn.addNodeConstructor !== 'function') {
+        return null; // Canvas renderer or unexpected API — fail soft.
+    }
+    if (!rn.hasNode('CRTFilter')) {
+        rn.addNodeConstructor('CRTFilter', CRTFilterRenderNode);
+    }
+    if (!camera.filters || !camera.filters.internal) {
+        return null;
+    }
+    return camera.filters.internal.add(new CRTFilter(camera));
+}
+
 if (typeof window !== 'undefined') {
-    window.CRTPipeline = CRTPipeline;
+    window.CRTFilter = CRTFilter;
+    window.CRTFilterRenderNode = CRTFilterRenderNode;
+    window.installCRTFilter = installCRTFilter;
 }
