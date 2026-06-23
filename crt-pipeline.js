@@ -113,7 +113,7 @@ class CRTFilter extends Phaser.Filters.Controller {
         super(camera, 'CRTFilter'); // 2nd arg must match the registered node name
         // Defaults tuned to stay readable for an arcade game. Tweak freely.
         this.scanlineIntensity = 1.2;
-        this.curvature = 4.0;          // higher = flatter (less aggressive than old 2.0)
+        this.curvature = 6.0;          // higher = flatter; ~halves the edge bulge vs 4.0
         this.vignetteIntensity = 1.3;
         this.noiseIntensity = 0.015;   // subtle grain; higher washes out small text
         this.chromaticIntensity = 1.0; // RGB split in px-ish; higher blurs text
