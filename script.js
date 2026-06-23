@@ -547,7 +547,11 @@ function enableCameraCRT(scene) {
 
 function disableCRT(scene) {
   if (crtPipeline) {
-    scene.cameras.main.clearRenderToTexture();
+    if (scene.cameras.main.clearRenderToTexture) {
+      scene.cameras.main.clearRenderToTexture();
+    } else if (scene.cameras.main.setRenderToTexture) {
+      scene.cameras.main.setRenderToTexture();
+    }
     crtPipeline = null;
   }
   if (cameraPostRender) {
@@ -556,45 +560,34 @@ function disableCRT(scene) {
   }
 }
 
+let toastTimeout = null;
+
 function showCRTFeedback(scene) {
   const modeText = crtMode === 'off' ? 'CRT: OFF' : crtMode === 'shader' ? 'CRT: SHADER' : 'CRT: CAMERA';
-  const color = crtMode === 'off' ? '#ff4444' : crtMode === 'shader' ? '#44ff44' : '#4488ff';
+  const modeClass = crtMode === 'off' ? 'crt-off' : crtMode === 'shader' ? 'crt-shader' : 'crt-camera';
   
-  // Create toast container
-  const toastBg = scene.add.rectangle(400, 50, 200, 40, 0x000000, 0.8)
-    .setOrigin(0.5)
-    .setDepth(1000)
-    .setStrokeStyle(2, parseInt(color.replace('#', '0x')));
+  const toast = document.getElementById('crt-toast');
+  if (!toast) return;
   
-  const text = scene.add.text(400, 50, modeText, {
-    fontFamily: "'Press Start 2P', monospace",
-    fontSize: '14px',
-    color: color
-  }).setOrigin(0.5).setDepth(1001);
+  // Clear any pending hide
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
   
-  // Slide in animation
-  toastBg.setX(600);
-  text.setX(600);
+  // Update content and style
+  toast.textContent = modeText;
+  toast.className = 'toast ' + modeClass;
   
-  scene.tweens.add({
-    targets: [toastBg, text],
-    x: 400,
-    duration: 300,
-    ease: 'Back.out',
-    onComplete: () => {
-      // Hold for 1.5s then fade out
-      scene.tweens.add({
-        targets: [toastBg, text],
-        alpha: 0,
-        duration: 500,
-        delay: 1500,
-        onComplete: () => {
-          toastBg.destroy();
-          text.destroy();
-        }
-      });
-    }
+  // Show with animation
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
   });
+  
+  // Hide after 1.5s
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 1500);
 }
 
 // === 觸控 / 螢幕控制狀態（由 setupTouchControls 維護） ===
