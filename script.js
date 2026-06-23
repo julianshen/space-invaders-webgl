@@ -466,10 +466,11 @@ function toggleCRT() {
 
 function enableShaderCRT(scene) {
   disableCRT(scene);
-  if (window.CRTPipeline && scene.renderer.pipelines) {
-    crtPipeline = scene.renderer.pipelines.add('CRT', new CRTPipeline(scene.game));
-    scene.cameras.main.setRenderToTexture(crtPipeline);
-  }
+  // WebGL pipeline disabled - causing rendering issues
+  // if (window.CRTPipeline && scene.renderer.pipelines) {
+  //   crtPipeline = scene.renderer.pipelines.add('CRT', new CRTPipeline(scene.game));
+  //   scene.cameras.main.setRenderToTexture(crtPipeline);
+  // }
 }
 
 function enableCameraCRT(scene) {
@@ -821,9 +822,10 @@ function startPlaying() {
   gamePhase = 'playing';
 
   // Enable CRT shader by default
-  if (crtMode === 'shader' && window.CRTPipeline && this.renderer.pipelines) {
-    enableShaderCRT(this);
-  }
+  // Disabled - causing rendering issues with Phaser 3.55.2
+  // if (crtMode === 'shader' && window.CRTPipeline && this.renderer.pipelines) {
+  //   enableShaderCRT(this);
+  // }
 
   // Initialize UFO spawn timer
   ufoNextSpawn = this.time.now + getUFOSpawnInterval();
