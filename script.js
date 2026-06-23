@@ -759,7 +759,7 @@ function create() {
   ufoGfx.refresh();
 
   // Phase 1: Blue intro text
-  introTexts.blueText = scene.add.text(300, 225,
+  introTexts.blueText = this.add.text(300, 225,
     'A long time ago in a galaxy\nfar, far away....', {
     fontFamily: 'monospace',
     fontSize: '22px',
@@ -769,7 +769,7 @@ function create() {
   }).setOrigin(0.5).setAlpha(0).setDepth(200);
 
   // Phase 2: Big yellow logo
-  introTexts.logo = scene.add.text(300, 210, 'SPACE\nINVADERS', {
+  introTexts.logo = this.add.text(300, 210, 'SPACE\nINVADERS', {
     fontFamily: 'monospace',
     fontSize: '56px',
     color: '#ffd700',
