@@ -512,7 +512,11 @@ const touchState = { left: false, right: false, fire: false };
 let highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0', 10);
 
 // === 片頭動畫 ===
-let gamePhase = 'intro'; // 'intro' | 'countdown' | 'playing' | 'gameover'
+let gamePhase = 'koi-presents'; // 'koi-presents' | 'intro' | 'countdown' | 'playing' | 'gameover'
+// === Koi play presents 製作商動畫 ===
+let koiSprite = null;
+let koiText = null;
+let koiPresentsStart = 0;
 let introStartTime = 0;
 let introIdleStart = 0; // intro idle timer → auto-transition to demo
 let introAliens = [];
@@ -554,6 +558,8 @@ function preload() {
   // 讓瀏覽器正常快取貼圖；之前每次載入都加 ?t=Date.now() 會強制重抓。
   // 玩家飛船改為程式生成（見 createShipTexture），不再依賴 spaceship.png。
   this.load.image('invader', 'invader1.png');
+  // Koi play presents 製作商動畫：4x4 sprite sheet（512x512，每幀 128x128）。
+  this.load.spritesheet('koi', 'assets/koi-sprite.png', { frameWidth: 128, frameHeight: 128 });
 }
 
 // 程式生成玩家飛船貼圖：經典雙砲戰機（綠色機身 + 青色座艙 + 霓虹翼尖）。
@@ -700,8 +706,34 @@ function create() {
     hideOnComplete: true
   });
 
-  // ========== Star Wars Opening Crawl ==========
-  gamePhase = 'intro';
+  // ========== Koi play presents 製作商動畫（在片頭 crawl 之前） ==========
+  // 扭捏害羞 idle 動畫（正面幀），9 fps 循環
+  this.anims.create({
+    key: 'koi-idle',
+    frames: this.anims.generateFrameNumbers('koi', { frames: [0, 1, 2, 3, 4, 5, 6, 8, 9] }),
+    frameRate: 9,
+    repeat: -1
+  });
+
+  // 角色：置中偏左（約 35%），放大到約 180px，機頭朝上
+  koiSprite = this.add.sprite(280, 300, 'koi', 0)
+    .setDisplaySize(180, 180)
+    .setDepth(250)
+    .setAlpha(0);
+  koiSprite.play('koi-idle');
+
+  // 文字：角色右手邊，打字機效果（內容在 runKoiPresents 逐字顯示）
+  koiText = this.add.text(372, 300, '', {
+    fontFamily: 'monospace',
+    fontSize: '28px',
+    color: '#ffdd00'
+  }).setOrigin(0, 0.5).setDepth(250).setAlpha(0);
+
+  // 純黑背景：暫時隱藏星空，動畫結束進 intro 時再開啟
+  if (starfield) starfield.setVisible(false);
+
+  gamePhase = 'koi-presents';
+  koiPresentsStart = this.time.now;
   introStartTime = this.time.now;
   introIdleStart = this.time.now;
 
@@ -1009,6 +1041,43 @@ function skipIntro() {
   }).setOrigin(0.5).setDepth(300).setVisible(false);
 }
 
+// Koi play presents 製作商動畫（每幀由 update 呼叫）
+const KOI_FULL_TEXT = 'Koi play presents';
+function runKoiPresents(scene) {
+  const FADE = 300;        // 淡入時間 (ms)
+  const TOTAL = 3000;      // 總長度 (ms)
+  const TYPE_START = 300;  // 打字機開始時間
+  const TYPE_MS = 90;      // 每字速度
+  const FADE_OUT = 200;    // 淡出時間
+
+  const t = scene.time.now - koiPresentsStart;
+
+  // 淡入 / 持續 / 淡出
+  let alpha = 1;
+  if (t <= FADE) alpha = t / FADE;
+  else if (t >= TOTAL - FADE_OUT) alpha = Math.max(0, (TOTAL - t) / FADE_OUT);
+  if (koiSprite) koiSprite.setAlpha(alpha);
+  if (koiText) koiText.setAlpha(alpha);
+
+  // 打字機效果
+  const chars = Math.max(0, Math.min(KOI_FULL_TEXT.length,
+    Math.floor((t - TYPE_START) / TYPE_MS)));
+  if (koiText) koiText.setText(KOI_FULL_TEXT.slice(0, chars));
+
+  // 結束 → 進入現有 intro 階段
+  if (t >= TOTAL) endKoiPresents(scene);
+}
+
+function endKoiPresents(scene) {
+  if (koiSprite) { koiSprite.destroy(); koiSprite = null; }
+  if (koiText) { koiText.destroy(); koiText = null; }
+  if (starfield) starfield.setVisible(true);
+
+  gamePhase = 'intro';
+  introStartTime = scene.time.now;
+  introIdleStart = scene.time.now;
+}
+
 // Star Wars Opening Crawl 動畫
 function runIntro(scene) {
   const elapsed = scene.time.now - introStartTime;
@@ -1238,6 +1307,12 @@ function runDemo(scene) {
 }
 
 function update() {
+  // 製作商動畫（Koi play presents）— 最一開始播放，3 秒後進 intro
+  if (gamePhase === 'koi-presents') {
+    runKoiPresents(this);
+    return;
+  }
+
   // 片頭動畫
   if (gamePhase === 'intro') {
     runIntro(this);

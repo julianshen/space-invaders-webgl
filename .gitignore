@@ -1,1 +1,4 @@
 .understand-anything/
+# Unprocessed source art for the Koi sprite (1254x1254, opaque bg).
+# The game loads the processed assets/koi-sprite.png (512x512, transparent).
+assets/koi-sprite-original.png
