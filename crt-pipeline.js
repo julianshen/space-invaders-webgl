@@ -21,7 +21,10 @@ precision mediump float;
 uniform sampler2D uMainSampler;   // rendered scene, auto-bound to texture unit 0
 uniform vec2 resolution;
 uniform float time;
-uniform float scanlineIntensity;
+uniform float scanlineIntensity;  // 掃描線銳利度（pow 指數，越大線越細越銳利）
+uniform float scanlineDepth;      // 掃描線深度（暗縫有多暗，0..1）
+uniform float maskIntensity;      // 陰罩強度（RGB 磷光條紋對比，0..1）
+uniform float brightness;         // 亮度補償（掃描線+陰罩會變暗，需補回）
 uniform float curvature;
 uniform float vignetteIntensity;
 uniform float noiseIntensity;
@@ -33,9 +36,20 @@ float random(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-float scanline(vec2 uv, float intensity) {
-    float scan = sin(uv.y * resolution.y * PI) * 0.5 + 0.5;
-    return pow(scan, intensity) * 0.1 + 0.9;
+// 水平掃描線：每 2px 一條，可調銳利度與深度
+float scanline(vec2 uv, float sharpness) {
+    float s = sin(uv.y * resolution.y * PI) * 0.5 + 0.5;
+    s = pow(s, sharpness);
+    return mix(1.0 - scanlineDepth, 1.0, s);
+}
+
+// 垂直 RGB 陰罩（aperture grille）：每 3 個像素為一組 R/G/B 磷光點
+vec3 shadowMask(vec2 uv) {
+    float m = mod(floor(uv.x * resolution.x), 3.0);
+    float dim = 1.0 - maskIntensity;
+    if (m < 1.0) return vec3(1.0, dim, dim);
+    if (m < 2.0) return vec3(dim, 1.0, dim);
+    return vec3(dim, dim, 1.0);
 }
 
 vec2 curve(vec2 uv, float amount) {
@@ -66,8 +80,12 @@ void main() {
 
     vec3 color = chromatic(uMainSampler, curvedUV, chromaticIntensity / resolution.x);
 
-    float scan = scanline(curvedUV, scanlineIntensity);
-    color *= scan;
+    // 掃描線 + RGB 陰罩（兩者都會壓暗畫面）
+    color *= scanline(curvedUV, scanlineIntensity);
+    color *= shadowMask(curvedUV);
+
+    // 亮度補償：把掃描線/陰罩壓掉的亮度補回來
+    color *= brightness;
 
     float vig = vignette(curvedUV, vignetteIntensity);
     color *= vig;
@@ -100,6 +118,9 @@ class CRTFilterRenderNode extends Phaser.Renderer.WebGL.RenderNodes.BaseFilterSh
         // exact shape of Phaser's loop API (the one cross-version-ambiguous bit).
         pm.setUniform('time', (performance.now() / 1000) % 3600);
         pm.setUniform('scanlineIntensity', controller.scanlineIntensity);
+        pm.setUniform('scanlineDepth', controller.scanlineDepth);
+        pm.setUniform('maskIntensity', controller.maskIntensity);
+        pm.setUniform('brightness', controller.brightness);
         pm.setUniform('curvature', controller.curvature);
         pm.setUniform('vignetteIntensity', controller.vignetteIntensity);
         pm.setUniform('noiseIntensity', controller.noiseIntensity);
@@ -112,7 +133,10 @@ class CRTFilter extends Phaser.Filters.Controller {
     constructor(camera) {
         super(camera, 'CRTFilter'); // 2nd arg must match the registered node name
         // Defaults tuned to stay readable for an arcade game. Tweak freely.
-        this.scanlineIntensity = 1.2;
+        this.scanlineIntensity = 1.5;  // pow exponent: higher = thinner/sharper bright lines
+        this.scanlineDepth = 0.45;     // how dark the gaps get (0=off, 1=black)
+        this.maskIntensity = 0.30;     // RGB phosphor mask contrast (0=off)
+        this.brightness = 1.45;        // compensate for scanline+mask dimming
         this.curvature = 6.0;          // higher = flatter; ~halves the edge bulge vs 4.0
         this.vignetteIntensity = 1.3;
         this.noiseIntensity = 0.015;   // subtle grain; higher washes out small text
