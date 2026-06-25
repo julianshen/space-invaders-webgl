@@ -1504,25 +1504,23 @@ function update() {
     // 間隔隨波數遞減（越來越快）
     const fireInterval = Math.max(600, 2000 - wave * 150);
     if (now - lastEnemyShot > fireInterval) {
-      // 從最下排的敵人隨機挑一個射擊
-      // 找出 Y 值最大的幾隻（最接近玩家）
+      // 找出最接近玩家（Y 值最大）的幾隻作為候選射手
       activeInvaders.sort((a, b) => b.y - a.y);
-      const shooters = activeInvaders.slice(0, Math.min(3, activeInvaders.length));
-      const shooter = Phaser.Math.RND.pick(shooters);
 
-      const eb = enemyBullets.get(shooter.x, shooter.y + 12, 'ebullet');
-      if (eb) {
-        eb.enableBody(true, shooter.x, shooter.y + 12, true, true);
-        eb.setSize(4, 8);
-        eb.setDisplaySize(4, 8);
-        const speed = 180 + wave * 15;
-        // player 可能在死亡/重建期間為 null 或 body 失效 → 此時直線下墜，
-        // 不要把 null 傳進 moveToObject（會丟例外、被 update 的 catch 吞掉）。
-        if (player && player.body && player.active) {
-          this.physics.moveToObject(eb, player, speed);
-        } else {
-          eb.setVelocityY(speed);
-        }
+      // 第 3 波之後，偶爾會有多隻同時開火（最多 4 隻）。
+      // 約一半機率單發，其餘隨機 2~4 發，營造「彈幕變密」的壓力。
+      let volley = 1;
+      if (wave > 3) {
+        volley = (Math.random() < 0.5) ? 1 : (2 + Math.floor(Math.random() * 3)); // 1 或 2~4
+      }
+      volley = Math.min(volley, activeInvaders.length);
+
+      // 候選池取得比射手數更大，從中隨機挑不重複的射手（避免同一隻連發兩枚）
+      const poolSize = Math.min(activeInvaders.length, Math.max(3, volley * 2));
+      const pool = activeInvaders.slice(0, poolSize);
+      for (let i = 0; i < volley && pool.length > 0; i++) {
+        const idx = Math.floor(Math.random() * pool.length);
+        spawnEnemyBullet(this, pool.splice(idx, 1)[0]);
       }
       lastEnemyShot = now;
     }
@@ -1585,6 +1583,24 @@ function update() {
     }
   }
 } catch(e) { console.warn('update err:', e); }  // 讓 update 內的錯誤可見，方便除錯
+}
+
+// 從指定敵人發射一枚子彈（朝玩家，或玩家失效時直線下墜）
+function spawnEnemyBullet(scene, shooter) {
+  if (!shooter) return;
+  const eb = enemyBullets.get(shooter.x, shooter.y + 12, 'ebullet');
+  if (!eb) return;
+  eb.enableBody(true, shooter.x, shooter.y + 12, true, true);
+  eb.setSize(4, 8);
+  eb.setDisplaySize(4, 8);
+  const speed = 180 + wave * 15;
+  // player 可能在死亡/重建期間為 null 或 body 失效 → 此時直線下墜，
+  // 不要把 null 傳進 moveToObject（會丟例外、被 update 的 catch 吞掉）。
+  if (player && player.body && player.active) {
+    scene.physics.moveToObject(eb, player, speed);
+  } else {
+    eb.setVelocityY(speed);
+  }
 }
 
 function hitPlayer(enemyBullet, playerSprite) {
