@@ -431,6 +431,14 @@ let wave = 1;
 let waveInitialCount = 0;
 let waveReformCount = 0;
 let lastReformTime = 0;
+// 核彈：飛得慢、爆炸範圍大、可一次消滅多個敵人；最多 3 發、每 5 波補滿、Enter 發射
+let nukes;
+let nukeAmmo = 3;
+let lastNukeReloadWave = 0;
+let enterKey;
+const NUKE_MAX = 3;
+const NUKE_SPEED = -220;        // 比一般子彈 (-450) 慢
+const NUKE_BLAST_RADIUS = 110;  // 爆炸半徑（像素）
 let scoreText;
 let gameOver = false;
 let lastShot = 0;
@@ -644,6 +652,19 @@ function create() {
   ctx.fillRect(0, 0, 4, 10);
   bulletGfx.refresh();
 
+  // 核彈貼圖：發光橘黃彈體 + 紅色核心（比一般子彈大很多）
+  const nukeGfx = this.textures.createCanvas('nuke', 20, 26);
+  const nctx = nukeGfx.getContext();
+  nctx.fillStyle = 'rgba(255,180,0,0.35)';                 // 外發光
+  nctx.beginPath(); nctx.ellipse(10, 13, 9, 12, 0, 0, Math.PI * 2); nctx.fill();
+  nctx.fillStyle = '#ffcc00';                              // 彈體
+  nctx.beginPath(); nctx.ellipse(10, 13, 6, 9, 0, 0, Math.PI * 2); nctx.fill();
+  nctx.fillStyle = '#ff3b00';                              // 核心
+  nctx.beginPath(); nctx.arc(10, 13, 3.2, 0, Math.PI * 2); nctx.fill();
+  nctx.fillStyle = '#fff6c0';                              // 高光
+  nctx.fillRect(7, 5, 2, 3);
+  nukeGfx.refresh();
+
   // 用程式生成敵人子彈（紅色的長條）
   const eBulletGfx = this.textures.createCanvas('ebullet', 4, 8);
   const ectx = eBulletGfx.getContext();
@@ -823,12 +844,18 @@ function startPlaying() {
   player.setCollideWorldBounds(true);
 
   cursors = this.input.keyboard.createCursorKeys();
+  enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
   // 真正的物件池
   bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 12 });
   enemyBullets = this.physics.add.group({ defaultKey: 'ebullet', maxSize: 20 });
+  nukes = this.physics.add.group({ defaultKey: 'nuke', maxSize: 4 });
   invaders = this.physics.add.group();
   explosions = this.add.group();
+
+  // 核彈彈藥（每局重置）
+  nukeAmmo = NUKE_MAX;
+  lastNukeReloadWave = 0;
 
   // UI 文字
   scoreText = this.add.text(16, 16, buildScoreText(), {
@@ -849,6 +876,7 @@ function startPlaying() {
 
   createWave.call(this, 1);
   this.physics.add.overlap(bullets, invaders, hitInvader, null, this);
+  this.physics.add.overlap(nukes, invaders, nukeHit, null, this);
   this._playerHitCollider = this.physics.add.overlap(enemyBullets, player, hitPlayer, null, this);
 
   drawLives.call(this);
@@ -929,6 +957,13 @@ function createWave(waveNum) {
   enemyBullets.getChildren().forEach(b => {
     if (b && b.body) b.disableBody(true, true);
   });
+  // 回收殘留核彈
+  if (nukes) nukes.getChildren().forEach(n => { if (n && n.body) n.disableBody(true, true); });
+  // 每 5 波補滿核彈（同一波因死亡而重建時不重複補給）
+  if (waveNum % 5 === 0 && lastNukeReloadWave !== waveNum) {
+    nukeAmmo = NUKE_MAX;
+    lastNukeReloadWave = waveNum;
+  }
 
   const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
   const cols = 8;
@@ -1056,6 +1091,70 @@ function shoot() {
 } catch(e) { console.warn('shoot err:',e); }
 }
 
+// === 核彈 ===
+// 發射一枚核彈（飛得慢、彈體大）。彈藥用完則無作用。
+function fireNuke() {
+  try {
+    if (gameOver || playerDead || !player) return;
+    if (nukeAmmo <= 0) return; // 沒彈藥
+    const nuke = nukes.get(player.x, player.y - 14, 'nuke');
+    if (!nuke) return;
+    nuke.enableBody(true, player.x, player.y - 14, true, true);
+    nuke.setData('detonated', false);
+    nuke.setSize(16, 22);
+    nuke.setDisplaySize(20, 26);
+    nuke.setDepth(60);
+    nuke.setVelocityY(NUKE_SPEED);
+    nukeAmmo--;
+    updateScoreText();
+    SoundManager.play('shoot');
+  } catch(e) { console.warn('fireNuke err:', e); }
+}
+
+// 核彈碰到敵人 → 引爆（overlap 可能同幀對多隻觸發，用 detonated 旗標只引爆一次）
+function nukeHit(nuke, invader) {
+  if (gameOver) return;
+  if (!nuke || nuke.getData('detonated')) return;
+  nuke.setData('detonated', true);
+  const x = nuke.x, y = nuke.y;
+  nuke.disableBody(true, true);
+  detonateNuke(this, x, y);
+}
+
+// 在 (x,y) 引爆：半徑內所有敵人一併消滅，並沿用 hitInvader 的清波 / 重整判定
+function detonateNuke(scene, x, y) {
+  const blast = explosions.create(x, y, 'explode_sheet', 0);
+  blast.setDisplaySize(NUKE_BLAST_RADIUS * 2, NUKE_BLAST_RADIUS * 2);
+  blast.setDepth(70);
+  blast.play('explode_pro');
+  blast.once('animationcomplete', () => blast.destroy());
+  SoundManager.play('explosion');
+
+  const victims = invaders.getChildren().filter(inv =>
+    inv && inv.active && Phaser.Math.Distance.Between(x, y, inv.x, inv.y) <= NUKE_BLAST_RADIUS);
+  victims.forEach(inv => {
+    const e = explosions.create(inv.x, inv.y, 'explode_sheet', 0);
+    e.setDisplaySize(56, 40);
+    e.play('explode_pro');
+    e.once('animationcomplete', () => e.destroy());
+    inv.destroy();
+    score += 100;
+  });
+  updateScoreText();
+
+  if (invaders.countActive(true) === 0) {
+    wave++;
+    updateScoreText();
+    SoundManager.play('waveComplete');
+    scene.time.delayedCall(700, () => {
+      if (gameOver || !gameReady) return;
+      createWave.call(scene, wave);
+    });
+  } else {
+    maybeReformInvaders(scene);
+  }
+}
+
 function hitInvader(bullet, invader) {
   // game over 後 overlap 仍可能被觸發（尤其子彈被 freezeField 凍在敵人身上時會每幀重複），
   // 守衛避免結束後還能計分 / 觸發爆炸 / 進下一波。
@@ -1089,7 +1188,7 @@ function hitInvader(bullet, invader) {
 }
 
 function buildScoreText() {
-  return `WAVE ${wave}   SCORE: ${score.toString().padStart(5, '0')}   HI: ${highScore.toString().padStart(5, '0')}`;
+  return `WAVE ${wave}   SCORE: ${score.toString().padStart(5, '0')}   HI: ${highScore.toString().padStart(5, '0')}   NUKE: ${nukeAmmo}`;
 }
 
 function updateScoreText() {
@@ -1523,6 +1622,11 @@ function update() {
     if ((cursors.space && cursors.space.isDown) || touchState.fire) {
       shoot.call(this);
     }
+
+    // Enter 發射核彈（單發，每次按鍵觸發一次）
+    if (enterKey && Phaser.Input.Keyboard.JustDown(enterKey)) {
+      fireNuke.call(this);
+    }
   }
 
   // === 敵人邊界反彈（只在 playing 時做） ===
@@ -1591,6 +1695,16 @@ function update() {
   // Player子彈超出畫面回收到池中（用快照，避免邊迭代邊修改 group 陣列）
   bullets.getChildren().slice().forEach(b => {
     if (b && b.active && b.y < 0) b.disableBody(true, true);
+  });
+
+  // 核彈飛到頂端仍未命中 → 在頂端引爆（不浪費這發珍貴核彈）
+  if (nukes) nukes.getChildren().slice().forEach(n => {
+    if (n && n.active && !n.getData('detonated') && n.y <= 55) {
+      n.setData('detonated', true);
+      const nx = n.x;
+      n.disableBody(true, true);
+      detonateNuke(this, nx, 70);
+    }
   });
 
   // 敵人射擊
@@ -1745,7 +1859,7 @@ function hitPlayer(enemyBullet, playerSprite) {
 
 // 停下場上所有敵人與子彈（GAME OVER 時呼叫，避免畫面繼續飄移）
 function freezeField() {
-  [invaders, enemyBullets, bullets].forEach(grp => {
+  [invaders, enemyBullets, bullets, nukes].forEach(grp => {
     if (!grp) return;
     grp.getChildren().forEach(o => {
       if (o && o.active && o.body) o.setVelocity(0, 0);
@@ -1793,11 +1907,14 @@ function restartGame() {
   deadUntil = 0;
   lastShot = 0;
   lastEnemyShot = 0;
+  nukeAmmo = NUKE_MAX;
+  lastNukeReloadWave = 0;
 
   // 清除所有 group
   invaders.clear(true, true);
   bullets.clear(true, true);
   enemyBullets.clear(true, true);
+  if (nukes) nukes.clear(true, true);
   explosions.clear(true, true);
   livesIcons.forEach(icon => icon.destroy());
   livesIcons = [];
