@@ -1,45 +1,47 @@
-# TEST REPORT: Star Wars Opening Crawl
+# TEST REPORT
 
-| Metric     | Value |
-|------------|-------|
-| Total      | 26    |
-| Passed     | 26    |
-| Failed     | 0     |
-| Coverage   | 100%  |
-| Regression | 12/12 ✅ |
+## Unit tests — pure game logic (`game-logic.js`)
 
-## Test Breakdown
+Runner: Node built-in (`node --test`). No external dependencies.
 
-| Category | Count | Status |
-|----------|-------|--------|
-| Pure Logic | 6 | ✅ |
-| Game State | 7 | ✅ |
-| Regression Guards | 5 | ✅ |
-| Intro + Crawl | 6 | ✅ |
-| Demo + Leaderboard | 2 | ✅ |
+```bash
+npm test          # run unit tests
+npm run coverage  # run with coverage report
+```
 
-## Verification
+| Metric | Value |
+|--------|-------|
+| Tests | 23 |
+| Passed | 23 |
+| Failed | 0 |
+| Line coverage | 100% |
+| Function coverage | 100% |
+| Branch coverage | 98.39% |
 
-| Session | Result |
-|---------|--------|
-| #1 (crawl + structure) | 5/5 ✅ |
-| #2 (game + demo) | 5/5 ✅ |
-| #3 (full mixed) | 6/6 ✅ |
+> The one uncovered branch is the UMD `typeof window` guard in `game-logic.js`,
+> which only executes in the browser and cannot run under Node.
 
-## Console Errors
+### What's covered
+The deterministic decision logic extracted from `script.js` into `game-logic.js`
+(shared by the game at runtime and by the tests), randomness injected for
+determinism:
 
-| Session | Errors |
-|---------|--------|
-| #1 | 0 |
-| #2 | 0 |
-| #3 | 0 |
+- HUD formatting (`formatScoreText`, `pad5`)
+- Wave/formation scaling (`waveRowCount`, `formationDir`, `formationSpeed`,
+  `steppedDrop`, `bounceSpeed`)
+- Enemy fire (`fireInterval`, `enemyBulletSpeed`, `volleyCount`, `clampVolley`,
+  `shooterPoolSize`)
+- Formation re-form (`reformThresholdCount`, `isReformEligible`, `reformSlot`)
+- Nukes (`shouldReloadNukes`, `withinBlast`)
+- UFO timing (`ufoSpawnInterval`)
+- Leaderboard (`leaderboardInsert`)
 
-## Crawl Phases Verified
+### Not unit-tested (Phaser-coupled, verified in-browser)
+Rendering, physics bodies, input wiring, animations, and the CRT filter are
+verified manually / via the browser suites below — they depend on the Phaser
+runtime and a WebGL context.
 
-- [x] Phase 1: Blue "A long time ago..." fades in/out
-- [x] Phase 2: Yellow "SPACE INVADERS" logo scales in/out
-- [x] Phase 3: Yellow crawl text scrolls with perspective effect
-- [x] Loop back to Phase 1 after ~16s
-- [x] skipIntro clears crawl elements → countdown → gameplay
-- [x] enterDemo cleans up crawl elements
-- [x] Demo leaderboard title is Star Wars themed
+## Browser suites (manual)
+`tests/test-suite.js` and `tests/test-pure.js` are pasted into the browser
+console after the game loads, to exercise Phaser-dependent behaviour
+(SoundManager, restartGame, freezeField, intro/crawl, demo leaderboard).

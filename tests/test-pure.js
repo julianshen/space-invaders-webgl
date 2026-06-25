@@ -67,30 +67,33 @@ test('buildScoreText — basic formatting', () => {
   wave = 1;
   score = 0;
   highScore = 500;
-  
+  nukeAmmo = 3;
+
   const result = buildScoreText();
-  
-  assertEquals(result, 'WAVE 1   SCORE: 00000   HI: 00500');
+
+  assertEquals(result, 'WAVE 1   SCORE: 00000   HI: 00500   NUKE: 3');
 });
 
 test('buildScoreText — padding at max values', () => {
   wave = 12;
   score = 99999;
   highScore = 99999;
-  
+  nukeAmmo = 0;
+
   const result = buildScoreText();
-  
-  assertEquals(result, 'WAVE 12   SCORE: 99999   HI: 99999');
+
+  assertEquals(result, 'WAVE 12   SCORE: 99999   HI: 99999   NUKE: 0');
 });
 
 test('buildScoreText — zero high score', () => {
   wave = 3;
   score = 2500;
   highScore = 0;
-  
+  nukeAmmo = 2;
+
   const result = buildScoreText();
-  
-  assertEquals(result, 'WAVE 3   SCORE: 02500   HI: 00000');
+
+  assertEquals(result, 'WAVE 3   SCORE: 02500   HI: 00000   NUKE: 2');
 });
 
 // =====================

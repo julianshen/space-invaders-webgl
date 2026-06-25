@@ -559,10 +559,7 @@ function getLeaderboard() {
 
 function saveScoreToLeaderboard(finalScore) {
   if (!finalScore || finalScore <= 0) return;
-  const board = getLeaderboard();
-  board.push(finalScore);
-  board.sort((a, b) => b - a);
-  const top10 = board.slice(0, LEADERBOARD_SIZE);
+  const top10 = GameLogic.leaderboardInsert(getLeaderboard(), finalScore, LEADERBOARD_SIZE);
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top10));
 }
 
@@ -890,7 +887,7 @@ function startPlaying() {
 // === UFO / Mystery Ship ===
 function getUFOSpawnInterval() {
   // Random interval between 15-30 seconds
-  return 15000 + Math.floor(Math.random() * 15000);
+  return GameLogic.ufoSpawnInterval();
 }
 
 function spawnUFO(scene) {
@@ -960,12 +957,12 @@ function createWave(waveNum) {
   // 回收殘留核彈
   if (nukes) nukes.getChildren().forEach(n => { if (n && n.body) n.disableBody(true, true); });
   // 每 5 波補滿核彈（同一波因死亡而重建時不重複補給）
-  if (waveNum % 5 === 0 && lastNukeReloadWave !== waveNum) {
+  if (GameLogic.shouldReloadNukes(waveNum, lastNukeReloadWave)) {
     nukeAmmo = NUKE_MAX;
     lastNukeReloadWave = waveNum;
   }
 
-  const rows = Math.min(4 + Math.floor(waveNum / 3), 6);
+  const rows = GameLogic.waveRowCount(waveNum);
   const cols = 8;
   const spacingX = 68;
   const startX = 110;
@@ -976,8 +973,8 @@ function createWave(waveNum) {
   lastReformTime = 0;
 
   // 整個敵陣統一方向移動（經典 Space Invaders 行為）
-  const formationDir = (waveNum % 2 === 0) ? 1 : -1;
-  const formationSpeed = INVADER_BASE_SPEED + (waveNum - 1) * 18;
+  const formationDir = GameLogic.formationDir(waveNum);
+  const formationSpeed = GameLogic.formationSpeed(waveNum, INVADER_BASE_SPEED);
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const inv = invaders.create(startX + col * spacingX, 90 + row * 55, 'invader');
@@ -998,15 +995,20 @@ const REFORM_MAX_PER_WAVE = 2;  // 每波最多重整次數
 
 // 在每次擊殺後判定：第 2 波之後、殘兵低於 60% 時，冷卻到了就擲一次骰子
 function maybeReformInvaders(scene) {
-  if (wave <= 2) return;
-  if (waveReformCount >= REFORM_MAX_PER_WAVE) return;
-  const active = invaders.countActive(true);
-  if (active === 0) return; // 已清空 → 進下一波，不重整
-  if (active >= Math.ceil(waveInitialCount * REFORM_THRESHOLD)) return; // 還沒低於 60%
+  const eligible = GameLogic.isReformEligible({
+    wave,
+    reformCount: waveReformCount,
+    active: invaders.countActive(true),
+    initial: waveInitialCount,
+    now: scene.time.now,
+    lastReformTime,
+    cooldown: REFORM_COOLDOWN,
+    maxPerWave: REFORM_MAX_PER_WAVE,
+    threshold: REFORM_THRESHOLD,
+  });
+  if (!eligible) return;
 
-  const now = scene.time.now;
-  if (now - lastReformTime < REFORM_COOLDOWN) return;
-  lastReformTime = now; // 不論成敗都重置冷卻，維持「偶爾」觸發
+  lastReformTime = scene.time.now; // 不論成敗都重置冷卻，維持「偶爾」觸發
   if (Math.random() >= REFORM_CHANCE) return;
 
   reformInvaders(scene);
@@ -1017,14 +1019,12 @@ function reformInvaders(scene) {
   const survivors = invaders.getChildren().filter(inv => inv.active && !inv.getData('reforming'));
   if (survivors.length === 0) return;
 
-  const cols = 8, spacingX = 68, startX = 110, topY = 90, rowSpacing = 55;
-  const dir = (wave % 2 === 0) ? 1 : -1;
-  const speed = INVADER_BASE_SPEED + (wave - 1) * 18;
+  const dir = GameLogic.formationDir(wave);
+  const speed = GameLogic.formationSpeed(wave, INVADER_BASE_SPEED);
 
   survivors.forEach((inv, i) => {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-    flyInvaderTo(scene, inv, startX + col * spacingX, topY + row * rowSpacing, row, speed, dir, i);
+    const slot = GameLogic.reformSlot(i);
+    flyInvaderTo(scene, inv, slot.x, slot.y, slot.row, speed, dir, i);
   });
 
   waveReformCount++;
@@ -1131,7 +1131,7 @@ function detonateNuke(scene, x, y) {
   SoundManager.play('explosion');
 
   const victims = invaders.getChildren().filter(inv =>
-    inv && inv.active && Phaser.Math.Distance.Between(x, y, inv.x, inv.y) <= NUKE_BLAST_RADIUS);
+    inv && inv.active && GameLogic.withinBlast(x, y, inv.x, inv.y, NUKE_BLAST_RADIUS));
   victims.forEach(inv => {
     const e = explosions.create(inv.x, inv.y, 'explode_sheet', 0);
     e.setDisplaySize(56, 40);
@@ -1188,7 +1188,7 @@ function hitInvader(bullet, invader) {
 }
 
 function buildScoreText() {
-  return `WAVE ${wave}   SCORE: ${score.toString().padStart(5, '0')}   HI: ${highScore.toString().padStart(5, '0')}   NUKE: ${nukeAmmo}`;
+  return GameLogic.formatScoreText(wave, score, highScore, nukeAmmo);
 }
 
 function updateScoreText() {
@@ -1681,13 +1681,12 @@ function update() {
       if (inv && inv.active && inv.body && !inv.getData('reforming')) {
         // 反彈後速度稍微加快（越打越快，但幅度小一點）
         const currentSpeed = Math.abs(inv.body.velocity.x);
-        const newSpeed = Math.min(currentSpeed + 2, 220);
+        const newSpeed = GameLogic.bounceSpeed(currentSpeed);
         const dir = side === 'left' ? 1 : -1;
         inv.setVelocityX(newSpeed * dir);
         // 階梯式掉落：後排掉得少，前排掉得多
         const row = inv.getData('row') || 0;
-        const dropAmount = 6 + row * 1.5;
-        inv.y += dropAmount;
+        inv.y += GameLogic.steppedDrop(row);
       }
     });
   }
@@ -1712,21 +1711,17 @@ function update() {
   if (activeInvaders.length > 0) {
     const now = this.time.now;
     // 間隔隨波數遞減（越來越快）
-    const fireInterval = Math.max(600, 2000 - wave * 150);
+    const fireInterval = GameLogic.fireInterval(wave);
     if (now - lastEnemyShot > fireInterval) {
       // 找出最接近玩家（Y 值最大）的幾隻作為候選射手
       activeInvaders.sort((a, b) => b.y - a.y);
 
       // 第 3 波之後，偶爾會有多隻同時開火（最多 4 隻）。
       // 約一半機率單發，其餘隨機 2~4 發，營造「彈幕變密」的壓力。
-      let volley = 1;
-      if (wave > 3) {
-        volley = (Math.random() < 0.5) ? 1 : (2 + Math.floor(Math.random() * 3)); // 1 或 2~4
-      }
-      volley = Math.min(volley, activeInvaders.length);
+      let volley = GameLogic.clampVolley(GameLogic.volleyCount(wave), activeInvaders.length);
 
       // 候選池取得比射手數更大，從中隨機挑不重複的射手（避免同一隻連發兩枚）
-      const poolSize = Math.min(activeInvaders.length, Math.max(3, volley * 2));
+      const poolSize = GameLogic.shooterPoolSize(volley, activeInvaders.length);
       const pool = activeInvaders.slice(0, poolSize);
       for (let i = 0; i < volley && pool.length > 0; i++) {
         const idx = Math.floor(Math.random() * pool.length);
@@ -1803,7 +1798,7 @@ function spawnEnemyBullet(scene, shooter) {
   eb.enableBody(true, shooter.x, shooter.y + 12, true, true);
   eb.setSize(4, 8);
   eb.setDisplaySize(4, 8);
-  const speed = 180 + wave * 15;
+  const speed = GameLogic.enemyBulletSpeed(wave);
   // player 可能在死亡/重建期間為 null 或 body 失效 → 此時直線下墜，
   // 不要把 null 傳進 moveToObject（會丟例外、被 update 的 catch 吞掉）。
   if (player && player.body && player.active) {

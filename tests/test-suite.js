@@ -21,13 +21,13 @@
   // Pure Logic
   // =====================
   run('buildScoreText basic', () => {
-    wave = 1; score = 0; highScore = 500;
-    eq(buildScoreText(), 'WAVE 1   SCORE: 00000   HI: 00500');
+    wave = 1; score = 0; highScore = 500; nukeAmmo = 3;
+    eq(buildScoreText(), 'WAVE 1   SCORE: 00000   HI: 00500   NUKE: 3');
   });
 
   run('buildScoreText max', () => {
-    wave = 12; score = 99999; highScore = 99999;
-    eq(buildScoreText(), 'WAVE 12   SCORE: 99999   HI: 99999');
+    wave = 12; score = 99999; highScore = 99999; nukeAmmo = 0;
+    eq(buildScoreText(), 'WAVE 12   SCORE: 99999   HI: 99999   NUKE: 0');
   });
 
   run('saveHighScore beat', () => {

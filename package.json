@@ -1,0 +1,10 @@
+{
+  "name": "space-invaders-webgl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Neon CRT Space Invaders (Phaser 4). Pure game logic is unit-tested with Node's built-in test runner.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "coverage": "node --test --experimental-test-coverage tests/*.test.js"
+  }
+}
