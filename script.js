@@ -977,9 +977,9 @@ function maybeReformInvaders(scene) {
   reformInvaders(scene);
 }
 
-// 把殘存的敵人拉回上方、重新排成整齊隊形（不新增敵人）
+// 把殘存的敵人「飛」回上方、沿隨機曲線重新排成整齊隊形（不新增敵人）
 function reformInvaders(scene) {
-  const survivors = invaders.getChildren().filter(inv => inv.active);
+  const survivors = invaders.getChildren().filter(inv => inv.active && !inv.getData('reforming'));
   if (survivors.length === 0) return;
 
   const cols = 8, spacingX = 68, startX = 110, topY = 90, rowSpacing = 55;
@@ -989,19 +989,53 @@ function reformInvaders(scene) {
   survivors.forEach((inv, i) => {
     const row = Math.floor(i / cols);
     const col = i % cols;
-    const x = startX + col * spacingX;
-    const y = topY + row * rowSpacing;
-    if (inv.body && inv.body.reset) inv.body.reset(x, y); // 物理瞬移（同步 body）
-    else inv.setPosition(x, y);
-    inv.setData('row', row);
-    inv.setVelocityX(speed * dir);
-    // 重整視覺提示：淡入閃爍
-    inv.setAlpha(0.25);
-    scene.tweens.add({ targets: inv, alpha: 1, duration: 350 });
+    flyInvaderTo(scene, inv, startX + col * spacingX, topY + row * rowSpacing, row, speed, dir, i);
   });
 
   waveReformCount++;
   SoundManager.play('waveComplete');
+}
+
+// 單一敵人沿隨機三次貝茲曲線飛到新位置；飛行期間停用物理（交給 tween 控制座標），
+// 抵達後恢復隊形速度。曲線的兩個控制點往垂直方向加隨機擺幅 → 每隻路徑都不同且彎曲。
+function flyInvaderTo(scene, inv, tx, ty, row, speed, dir, index) {
+  const sx = inv.x, sy = inv.y;
+
+  inv.setData('reforming', true);
+  if (inv.body) { inv.setVelocity(0, 0); inv.body.enable = false; }
+
+  const dx = tx - sx, dy = ty - sy;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len, py = dx / len; // 垂直單位向量
+  const swing = () => Phaser.Math.Between(-130, 130);
+  const jitter = () => Phaser.Math.Between(-40, 40);
+  const c1 = new Phaser.Math.Vector2(sx + dx * 0.33 + px * swing(), sy + dy * 0.33 + py * swing() + jitter());
+  const c2 = new Phaser.Math.Vector2(sx + dx * 0.66 + px * swing(), sy + dy * 0.66 + py * swing() + jitter());
+  const curve = new Phaser.Curves.CubicBezier(
+    new Phaser.Math.Vector2(sx, sy), c1, c2, new Phaser.Math.Vector2(tx, ty)
+  );
+
+  const p = new Phaser.Math.Vector2();
+  const state = { t: 0 };
+  scene.tweens.add({
+    targets: state,
+    t: 1,
+    duration: Phaser.Math.Between(750, 1150),
+    delay: index * 30,            // 稍微錯開出發時間，營造逐一歸隊感
+    ease: 'Sine.easeInOut',
+    onUpdate: () => {
+      if (!inv || !inv.active) return; // 飛行途中若被清場/重啟就放棄
+      curve.getPoint(state.t, p);
+      inv.setPosition(p.x, p.y);
+    },
+    onComplete: () => {
+      if (!inv || !inv.active) return;
+      inv.setPosition(tx, ty);
+      inv.setData('row', row);
+      inv.setData('reforming', false);
+      if (inv.body) { inv.body.enable = true; inv.body.reset(tx, ty); inv.setVelocityX(speed * dir); }
+    }
+  });
 }
 
 function shoot() {
@@ -1502,6 +1536,7 @@ function update() {
   const invaderSnapshot = invaders.getChildren().slice();
   for (const inv of invaderSnapshot) {
     if (!inv || !inv.active || !inv.body) continue;
+    if (inv.getData('reforming')) continue; // 歸隊飛行中，不參與邊界反彈/到底判定
     // 只有「正朝牆壁移動」時才反彈，否則卡在邊界的敵人會每幀重複反彈，
     // 造成連續多次掉落 + 速度暴衝。
     if (inv.x < 40 && inv.body.velocity.x < 0) { bounce = true; side = 'left'; }
@@ -1539,7 +1574,7 @@ function update() {
 
   if (bounce) {
     invaders.getChildren().slice().forEach(inv => {
-      if (inv && inv.active && inv.body) {
+      if (inv && inv.active && inv.body && !inv.getData('reforming')) {
         // 反彈後速度稍微加快（越打越快，但幅度小一點）
         const currentSpeed = Math.abs(inv.body.velocity.x);
         const newSpeed = Math.min(currentSpeed + 2, 220);
@@ -1559,7 +1594,7 @@ function update() {
   });
 
   // 敵人射擊
-  const activeInvaders = invaders.getChildren().filter(inv => inv.active);
+  const activeInvaders = invaders.getChildren().filter(inv => inv.active && !inv.getData('reforming'));
   if (activeInvaders.length > 0) {
     const now = this.time.now;
     // 間隔隨波數遞減（越來越快）
