@@ -427,6 +427,10 @@ let explosions;
 let starfield;
 let score = 0;
 let wave = 1;
+// 隊形重整（re-form）：第 2 波之後、殘兵低於 60% 時有機率重整，每波最多兩次
+let waveInitialCount = 0;
+let waveReformCount = 0;
+let lastReformTime = 0;
 let scoreText;
 let gameOver = false;
 let lastShot = 0;
@@ -931,6 +935,11 @@ function createWave(waveNum) {
   const spacingX = 68;
   const startX = 110;
 
+  // 重置本波的隊形重整狀態
+  waveInitialCount = rows * cols;
+  waveReformCount = 0;
+  lastReformTime = 0;
+
   // 整個敵陣統一方向移動（經典 Space Invaders 行為）
   const formationDir = (waveNum % 2 === 0) ? 1 : -1;
   const formationSpeed = INVADER_BASE_SPEED + (waveNum - 1) * 18;
@@ -944,6 +953,55 @@ function createWave(waveNum) {
     }
   }
 } catch(e) { console.warn('createWave err:',e); }
+}
+
+// === 隊形重整（re-form） ===
+const REFORM_THRESHOLD = 0.6;   // 殘兵低於初始的 60% 才可能觸發
+const REFORM_CHANCE = 0.30;     // 每次符合條件時的觸發機率
+const REFORM_COOLDOWN = 5000;   // 兩次判定之間的冷卻 (ms)
+const REFORM_MAX_PER_WAVE = 2;  // 每波最多重整次數
+
+// 在每次擊殺後判定：第 2 波之後、殘兵低於 60% 時，冷卻到了就擲一次骰子
+function maybeReformInvaders(scene) {
+  if (wave <= 2) return;
+  if (waveReformCount >= REFORM_MAX_PER_WAVE) return;
+  const active = invaders.countActive(true);
+  if (active === 0) return; // 已清空 → 進下一波，不重整
+  if (active >= Math.ceil(waveInitialCount * REFORM_THRESHOLD)) return; // 還沒低於 60%
+
+  const now = scene.time.now;
+  if (now - lastReformTime < REFORM_COOLDOWN) return;
+  lastReformTime = now; // 不論成敗都重置冷卻，維持「偶爾」觸發
+  if (Math.random() >= REFORM_CHANCE) return;
+
+  reformInvaders(scene);
+}
+
+// 把殘存的敵人拉回上方、重新排成整齊隊形（不新增敵人）
+function reformInvaders(scene) {
+  const survivors = invaders.getChildren().filter(inv => inv.active);
+  if (survivors.length === 0) return;
+
+  const cols = 8, spacingX = 68, startX = 110, topY = 90, rowSpacing = 55;
+  const dir = (wave % 2 === 0) ? 1 : -1;
+  const speed = INVADER_BASE_SPEED + (wave - 1) * 18;
+
+  survivors.forEach((inv, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const x = startX + col * spacingX;
+    const y = topY + row * rowSpacing;
+    if (inv.body && inv.body.reset) inv.body.reset(x, y); // 物理瞬移（同步 body）
+    else inv.setPosition(x, y);
+    inv.setData('row', row);
+    inv.setVelocityX(speed * dir);
+    // 重整視覺提示：淡入閃爍
+    inv.setAlpha(0.25);
+    scene.tweens.add({ targets: inv, alpha: 1, duration: 350 });
+  });
+
+  waveReformCount++;
+  SoundManager.play('waveComplete');
 }
 
 function shoot() {
@@ -990,6 +1048,9 @@ function hitInvader(bullet, invader) {
       if (gameOver || !gameReady) return;
       createWave.call(this, wave);
     });
+  } else {
+    // 還有殘兵 → 視情況觸發隊形重整
+    maybeReformInvaders(this);
   }
 }
 
