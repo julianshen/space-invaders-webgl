@@ -94,9 +94,17 @@
        機台整體（bezel + 畫面）用 transform 等比縮放以保留對位。 */
     #stage {
       position: relative;
-      line-height: 0;
     }
-    #stage:fullscreen,
+    /* 標準與 -webkit- 前綴分開寫：若合併成同一組選擇器，
+       不認得前綴的瀏覽器（如 Firefox）會整條規則作廢。 */
+    #stage:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
     #stage:-webkit-full-screen {
       width: 100vw;
       height: 100vh;

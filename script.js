@@ -2022,8 +2022,10 @@ function handleGamepadDown(pad, button, value) {
 window.addEventListener('keydown', e => {
   SoundManager.unlockAudio();
 
-  // F 鍵切換全螢幕（各階段皆可用，且不影響 demo/intro 流程）
-  if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
+  // F 鍵切換全螢幕（各階段皆可用，且不影響 demo/intro 流程）。
+  // 排除含修飾鍵的組合，避免劫持 Ctrl+F / Cmd+F（尋找）等瀏覽器快捷鍵。
+  if ((e.key === 'f' || e.key === 'F' || e.code === 'KeyF') &&
+      !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     toggleFullscreen();
     return;
@@ -2107,8 +2109,9 @@ function showToast(text, className) {
   if (!toast) return;
   if (toastTimeout) { clearTimeout(toastTimeout); toastTimeout = null; }
   toast.textContent = text;
-  toast.className = 'toast ' + (className || '');
-  requestAnimationFrame(() => toast.classList.add('show'));
+  // 直接帶上 show：元素已在 DOM 中，opacity/transform transition 仍會觸發；
+  // 用 rAF 分兩步反而會在重複顯示時閃一下。
+  toast.className = 'toast ' + (className || '') + ' show';
   toastTimeout = setTimeout(() => toast.classList.remove('show'), 1500);
 }
 
