@@ -2022,6 +2022,13 @@ function handleGamepadDown(pad, button, value) {
 window.addEventListener('keydown', e => {
   SoundManager.unlockAudio();
 
+  // F 鍵切換全螢幕（各階段皆可用，且不影響 demo/intro 流程）
+  if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
+    e.preventDefault();
+    toggleFullscreen();
+    return;
+  }
+
   // Demo 期間按任意鍵 → 回 intro
   if (gamePhase === 'demo') {
     exitDemoToIntro(game.scene.scenes[0]);
@@ -2051,6 +2058,76 @@ window.addEventListener('keydown', e => {
     restartGame();
   }
 }, { capture: true });
+
+// ====================
+// 全螢幕模式：整台機台（bezel + 畫面）等比放大填滿螢幕
+// 觸發來源：F 鍵、遊戲畫面雙擊。皆為使用者手勢，符合 Fullscreen API 要求。
+// ====================
+const STAGE_W = 1280, STAGE_H = 960; // 機台原始尺寸，用來算縮放比例
+
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function toggleFullscreen() {
+  const stage = document.getElementById('stage') || document.documentElement;
+  if (!fullscreenElement()) {
+    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+    if (req) {
+      try { const p = req.call(stage); if (p && p.catch) p.catch(() => {}); } catch (_) {}
+    }
+  } else {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) { try { exit.call(document); } catch (_) {} }
+  }
+}
+
+// 全螢幕時把機台等比縮放到剛好塞進視窗（保留 4:3 對位），離開時清除 transform。
+function updateFullscreenScale() {
+  const stage = document.getElementById('stage');
+  const cabinet = document.querySelector('.cabinet');
+  if (!cabinet) return;
+  if (stage && fullscreenElement() === stage) {
+    const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+    cabinet.style.transform = 'scale(' + s + ')';
+  } else {
+    cabinet.style.transform = '';
+  }
+}
+
+function onFullscreenChange() {
+  updateFullscreenScale();
+  showToast(fullscreenElement() ? 'FULLSCREEN: ON' : 'FULLSCREEN: OFF',
+    fullscreenElement() ? 'crt-shader' : 'crt-off');
+}
+
+// 通用 toast（沿用 CRT 提示的元素與動畫）
+function showToast(text, className) {
+  const toast = document.getElementById('crt-toast');
+  if (!toast) return;
+  if (toastTimeout) { clearTimeout(toastTimeout); toastTimeout = null; }
+  toast.textContent = text;
+  toast.className = 'toast ' + (className || '');
+  requestAnimationFrame(() => toast.classList.add('show'));
+  toastTimeout = setTimeout(() => toast.classList.remove('show'), 1500);
+}
+
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+window.addEventListener('resize', updateFullscreenScale);
+
+// 遊戲畫面雙擊 → 切換全螢幕（滑鼠使用者也能用）
+function setupFullscreenToggle() {
+  const gc = document.getElementById('game-container');
+  if (gc) {
+    gc.addEventListener('dblclick', () => { SoundManager.unlockAudio(); toggleFullscreen(); });
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupFullscreenToggle);
+} else {
+  setupFullscreenToggle();
+}
 
 // ====================
 // 螢幕 / 觸控控制：把機台上的搖桿與 FIRE 鈕接上遊戲
