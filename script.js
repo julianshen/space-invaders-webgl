@@ -835,6 +835,14 @@ function create() {
   if (crtMode === 'shader') {
     enableShaderCRT(this);
   }
+
+  // 原生手把（Gamepad API）：在 create() 註冊一次即可（涵蓋 intro/demo/gameover），
+  // 避免放在 startPlaying() 會每局重複註冊、且開機到遊戲前無法用手把。
+  // 離散按鍵（開始 / 重來 / 核彈 / 退出 demo）走事件；移動與連射在 update() 內輪詢。
+  if (this.input.gamepad) {
+    this.input.gamepad.on('down', handleGamepadDown, this);
+    this.input.gamepad.on('connected', () => SoundManager.unlockAudio());
+  }
 }
 
 function startPlaying() {
@@ -845,13 +853,6 @@ function startPlaying() {
 
   cursors = this.input.keyboard.createCursorKeys();
   enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-
-  // 原生手把（Gamepad API）：離散按鍵（開始 / 重來 / 核彈 / 退出 demo）走事件；
-  // 移動與連續射擊在 update() 內輪詢類比搖桿，見下方。
-  if (this.input.gamepad) {
-    this.input.gamepad.on('down', handleGamepadDown, this);
-    this.input.gamepad.on('connected', () => SoundManager.unlockAudio());
-  }
 
   // 真正的物件池
   bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 12 });
@@ -1603,8 +1604,9 @@ function update() {
       // D-pad（標準佈局 14=左 15=右）；優先用具名 getter，退回原始 buttons
       padLeft = !!pad.left || btn(14);
       padRight = !!pad.right || btn(15);
-      // 主鈕 / 扳機射擊（0=A 7=R2）；R1(5) 保留給核彈，避免同鍵重疊
-      padFire = !!(pad.A || pad.R2) || btn(0) || btn(7);
+      // 主鈕 / 扳機射擊（0=A 7=R2）；R1(5) 保留給核彈，避免同鍵重疊。
+      // R2 是 0~1 類比值，加 0.1 死區避免扳機漂移造成連續誤射。
+      padFire = !!pad.A || (pad.R2 > 0.1) || btn(0) || btn(7);
     }
 
     // 鍵盤方向鍵、螢幕搖桿、手把 D-pad 皆可控制
