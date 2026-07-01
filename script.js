@@ -2022,13 +2022,14 @@ function handleGamepadDown(pad, button, value) {
 window.addEventListener('keydown', e => {
   SoundManager.unlockAudio();
 
-  // F 鍵切換全螢幕（各階段皆可用，且不影響 demo/intro 流程）。
-  // 排除含修飾鍵的組合，避免劫持 Ctrl+F / Cmd+F（尋找）等瀏覽器快捷鍵。
+  // F 鍵切換全螢幕。排除含修飾鍵組合，避免劫持 Ctrl+F / Cmd+F（尋找）。
+  // 不 early-return：讓事件繼續往下走各階段處理，這樣 intro 會刷新 idle 計時、
+  // demo 也照「任意鍵」規則退出，避免按 F 後卡在 demo 或立刻跳進 demo。
   if ((e.key === 'f' || e.key === 'F' || e.code === 'KeyF') &&
       !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     toggleFullscreen();
-    return;
+    // 故意不 return，續走下方階段邏輯
   }
 
   // Demo 期間按任意鍵 → 回 intro
