@@ -1594,8 +1594,13 @@ function update() {
 
     // 原生手把：類比搖桿 / D-pad / 射擊鍵（每幀輪詢連續狀態）
     let padAxis = 0, padLeft = false, padRight = false, padFire = false;
-    const pad = (this.input.gamepad && this.input.gamepad.total > 0)
-      ? this.input.gamepad.getPad(0) : null;
+    // 取「第一個已連線」的手把，而非硬寫 index 0：若唯一連線的手把 index 非 0
+    // （例如 pad 0 拔掉後只剩 pad 1），getPad(0) 會是 undefined 而讓手把看似失效。
+    const gp = this.input.gamepad;
+    let pad = null;
+    if (gp && gp.total > 0) {
+      pad = (gp.getAll && gp.getAll().find(p => p && p.connected)) || gp.getPad(0) || null;
+    }
     if (pad && pad.connected) {
       const btn = i => pad.buttons && pad.buttons[i] && pad.buttons[i].pressed;
       const ax = pad.leftStick ? pad.leftStick.x
