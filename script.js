@@ -410,6 +410,9 @@ const config = {
     default: 'arcade',
     arcade: { debug: false }
   },
+  input: {
+    gamepad: true // 啟用原生 Gamepad API 支援（實體搖桿 / 手把）
+  },
   scene: {
     preload: preload,
     create: create,
@@ -831,6 +834,14 @@ function create() {
   // Enable the CRT shader for the whole experience (menu, intro and gameplay).
   if (crtMode === 'shader') {
     enableShaderCRT(this);
+  }
+
+  // 原生手把（Gamepad API）：在 create() 註冊一次即可（涵蓋 intro/demo/gameover），
+  // 避免放在 startPlaying() 會每局重複註冊、且開機到遊戲前無法用手把。
+  // 離散按鍵（開始 / 重來 / 核彈 / 退出 demo）走事件；移動與連射在 update() 內輪詢。
+  if (this.input.gamepad) {
+    this.input.gamepad.on('down', handleGamepadDown, this);
+    this.input.gamepad.on('connected', () => SoundManager.unlockAudio());
   }
 }
 
@@ -1581,9 +1592,31 @@ function update() {
       }
     }
 
-    // 鍵盤方向鍵或螢幕搖桿皆可控制
-    const moveLeft = cursors.left.isDown || touchState.left;
-    const moveRight = cursors.right.isDown || touchState.right;
+    // 原生手把：類比搖桿 / D-pad / 射擊鍵（每幀輪詢連續狀態）
+    let padAxis = 0, padLeft = false, padRight = false, padFire = false;
+    // 取「第一個已連線」的手把，而非硬寫 index 0：若唯一連線的手把 index 非 0
+    // （例如 pad 0 拔掉後只剩 pad 1），getPad(0) 會是 undefined 而讓手把看似失效。
+    const gp = this.input.gamepad;
+    let pad = null;
+    if (gp && gp.total > 0) {
+      pad = (gp.getAll && gp.getAll().find(p => p && p.connected)) || gp.getPad(0) || null;
+    }
+    if (pad && pad.connected) {
+      const btn = i => pad.buttons && pad.buttons[i] && pad.buttons[i].pressed;
+      const ax = pad.leftStick ? pad.leftStick.x
+        : (pad.axes && pad.axes.length ? pad.axes[0].getValue() : 0);
+      if (Math.abs(ax) > 0.20) padAxis = ax; // 死區，避免搖桿漂移
+      // D-pad（標準佈局 14=左 15=右）；優先用具名 getter，退回原始 buttons
+      padLeft = !!pad.left || btn(14);
+      padRight = !!pad.right || btn(15);
+      // 主鈕 / 扳機射擊（0=A 7=R2）；R1(5) 保留給核彈，避免同鍵重疊。
+      // R2 是 0~1 類比值，加 0.1 死區避免扳機漂移造成連續誤射。
+      padFire = !!pad.A || (pad.R2 > 0.1) || btn(0) || btn(7);
+    }
+
+    // 鍵盤方向鍵、螢幕搖桿、手把 D-pad 皆可控制
+    const moveLeft = cursors.left.isDown || touchState.left || padLeft;
+    const moveRight = cursors.right.isDown || touchState.right || padRight;
     if (player && player.body) {
       const maxSpeed = 350;
       const acceleration = 2000; // pixels per second squared
@@ -1591,7 +1624,9 @@ function update() {
       const dt = this.game.loop.delta / 1000; // delta time in seconds
 
       let targetVelocity = 0;
-      if (moveLeft) targetVelocity = -maxSpeed;
+      // 類比搖桿優先：依推桿幅度給比例速度（原生手感）；否則用數位方向
+      if (padAxis !== 0) targetVelocity = padAxis * maxSpeed;
+      else if (moveLeft) targetVelocity = -maxSpeed;
       else if (moveRight) targetVelocity = maxSpeed;
 
       const currentVelocity = player.body.velocity.x;
@@ -1618,8 +1653,8 @@ function update() {
       player.setVelocityX(newVelocity);
     }
 
-    // 按住空白鍵或螢幕火力鍵連發（shoot 內含 180ms 冷卻）
-    if ((cursors.space && cursors.space.isDown) || touchState.fire) {
+    // 按住空白鍵 / 螢幕火力鍵 / 手把射擊鍵連發（shoot 內含 180ms 冷卻）
+    if ((cursors.space && cursors.space.isDown) || touchState.fire || padFire) {
       shoot.call(this);
     }
 
@@ -1956,21 +1991,40 @@ function restartGame() {
   }, { once: true });
 });
 
+// Demo → intro 轉場（鍵盤任意鍵與手把任意鍵共用）
+function exitDemoToIntro(scene) {
+  Object.values(demoTexts).forEach(t => {
+    if (Array.isArray(t)) t.forEach(x => { if (x && x.destroy) x.destroy(); });
+    else if (t && t.destroy) t.destroy();
+  });
+  demoTexts = {};
+  gamePhase = 'intro';
+  introStartTime = scene.time.now;
+  introIdleStart = scene.time.now;
+  rebuildIntro();
+}
+
+// 手把離散按鍵：開始 / 重來 / 退出 demo / 核彈。移動與連射走 update() 輪詢。
+// 註冊時以 scene 為 context，故此處 this === scene。
+// GamepadPlugin 'down' 事件簽名為 (pad, button, value)，按鍵編號在 button.index。
+function handleGamepadDown(pad, button, value) {
+  SoundManager.unlockAudio();
+  if (gamePhase === 'demo') { exitDemoToIntro(this); return; }
+  if (gamePhase === 'intro') { skipIntro(); return; }
+  if (gameOver) { gameOverIdleStart = 0; restartGame(); return; }
+  // 遊戲進行中：B(1) / Y(3) / R1(5) 發射核彈（A / 扳機的連射在 update 輪詢）
+  const index = button && typeof button.index === 'number' ? button.index : -1;
+  if (gamePhase === 'playing' && !playerDead && (index === 1 || index === 3 || index === 5)) {
+    fireNuke.call(this);
+  }
+}
+
 window.addEventListener('keydown', e => {
   SoundManager.unlockAudio();
 
   // Demo 期間按任意鍵 → 回 intro
   if (gamePhase === 'demo') {
-    Object.values(demoTexts).forEach(t => {
-      if (Array.isArray(t)) t.forEach(x => { if (x && x.destroy) x.destroy(); });
-      else if (t && t.destroy) t.destroy();
-    });
-    demoTexts = {};
-    gamePhase = 'intro';
-    introStartTime = game.scene.scenes[0].time.now;
-    introIdleStart = game.scene.scenes[0].time.now;
-    // 重建 intro
-    rebuildIntro();
+    exitDemoToIntro(game.scene.scenes[0]);
     return;
   }
 
