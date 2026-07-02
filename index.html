@@ -89,6 +89,31 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(68,136,255,0.4);
     }
 
+    /* ===== 全螢幕包裝層 ===== */
+    /* 一般狀態不影響排版；進入全螢幕時填滿螢幕並置中，
+       機台整體（bezel + 畫面）用 transform 等比縮放以保留對位。 */
+    #stage {
+      position: relative;
+    }
+    /* 標準與 -webkit- 前綴分開寫：若合併成同一組選擇器，
+       不認得前綴的瀏覽器（如 Firefox）會整條規則作廢。 */
+    #stage:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+    #stage:-webkit-full-screen {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
     /* ===== Cabinet (使用自訂 bezel 圖) ===== */
     .cabinet {
       position: relative;
@@ -98,6 +123,7 @@
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 0 60px rgba(0,0,0,0.9), 0 15px 40px rgba(0,0,0,0.7);
+      transform-origin: center center;
     }
 
     /* 遊戲畫面區域 */
@@ -124,11 +150,13 @@
   </style>
 </head>
 <body>
-  <div class="toast-container">
-    <div class="toast" id="crt-toast">CRT: OFF</div>
-  </div>
-  <div class="cabinet">
-    <div class="screen-area" id="game-container"></div>
+  <div id="stage">
+    <div class="toast-container">
+      <div class="toast" id="crt-toast">CRT: OFF</div>
+    </div>
+    <div class="cabinet">
+      <div class="screen-area" id="game-container"></div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@4.2.0/dist/phaser.min.js"></script>
   <script src="game-logic.js"></script>
